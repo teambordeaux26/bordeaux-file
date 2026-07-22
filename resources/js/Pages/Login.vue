@@ -1,55 +1,59 @@
 <template>
     <Head title="Login" />
-    <div class="min-h-screen bg-[#f5f5f5] text-gray-900 font-sans flex flex-col">
+    <div class="min-h-screen bg-[#f5f5f5] text-gray-900 font-sans flex flex-col overflow-x-hidden">
 
         <!-- Top Government Banner -->
-        <div class="anim-1 bg-[#003366] text-white text-[10px] sm:text-xs py-1 text-center tracking-widest uppercase leading-relaxed px-4">
-            Republic of the Philippines &nbsp;|&nbsp; Province of Albay &nbsp;|&nbsp; Municipality of Oas
+        <div class="anim-1 bg-[#003366] text-white text-[9px] sm:text-xs py-1.5 sm:py-1 text-center tracking-wide sm:tracking-widest uppercase leading-snug sm:leading-relaxed px-3 sm:px-4">
+            Republic of the Philippines
+            <span class="text-white/60"> | </span>
+            Province of Albay
+            <span class="text-white/60"> | </span>
+            Municipality of Oas
         </div>
 
         <!-- Header -->
         <header class="anim-2 bg-white border-b-4 border-[#FFD700] shadow-md">
-            <div class="mx-auto max-w-6xl px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3">
-                <img :src="'/images/logo.png'" alt="Oas Albay Seal" class="h-10 w-10 sm:h-14 sm:w-14 object-contain shrink-0" />
-                <div>
+            <div class="mx-auto max-w-6xl px-3 sm:px-6 py-3 sm:py-4 flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <img :src="'/images/logo.png'" alt="Oas Albay Seal" class="h-9 w-9 sm:h-14 sm:w-14 object-contain shrink-0" />
+                <div class="min-w-0">
                     <p class="text-[9px] sm:text-[10px] uppercase tracking-widest text-gray-500 font-semibold hidden sm:block">Official Website</p>
                     <h1 class="text-sm sm:text-lg font-bold text-[#003366] leading-tight">Document Management System</h1>
-                    <p class="text-xs text-gray-600 hidden sm:block">Office of the Vice Mayor &mdash; Oas, Albay</p>
+                    <p class="text-[11px] sm:text-xs text-gray-600">Office of the Vice Mayor &mdash; Oas, Albay</p>
                 </div>
             </div>
         </header>
 
         <!-- Page Body -->
-        <div class="flex-1 flex flex-col items-center justify-start lg:justify-center px-4 sm:px-6 py-8 sm:py-12">
+        <div class="flex-1 flex flex-col items-center justify-start lg:justify-center px-3 sm:px-6 py-6 sm:py-12">
             <div class="w-full max-w-5xl">
 
                 <!-- Back link -->
-                <Link href="/" class="anim-3 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#003366] transition mb-5">
+                <Link href="/" class="anim-3 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#003366] transition mb-4 sm:mb-5 min-h-[44px] sm:min-h-0 py-2 sm:py-0">
                     &larr; Back to Home
                 </Link>
 
-                <div class="grid gap-8 lg:gap-10 lg:grid-cols-2 items-start">
+                <div class="grid gap-6 sm:gap-8 lg:gap-10 lg:grid-cols-2 items-start">
 
                     <!-- Login Form — first on mobile, right on desktop -->
-                    <div class="anim-4 bg-white border border-gray-300 border-t-4 border-t-[#003366] shadow-md p-6 sm:p-8 order-first lg:order-last">
-                        <div class="flex items-center gap-3 mb-5 pb-4 border-b border-gray-200">
-                            <img :src="'/images/logo.png'" alt="Seal" class="h-9 w-9 sm:h-10 sm:w-10 object-contain shrink-0" />
-                            <div>
+                    <div class="anim-4 bg-white border border-gray-300 border-t-4 border-t-[#003366] shadow-md p-4 sm:p-8 order-first lg:order-last w-full">
+                        <div class="flex items-center gap-3 mb-4 sm:mb-5 pb-3 sm:pb-4 border-b border-gray-200">
+                            <img :src="'/images/logo.png'" alt="Seal" class="h-8 w-8 sm:h-10 sm:w-10 object-contain shrink-0" />
+                            <div class="min-w-0">
                                 <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">System Access</p>
-                                <h2 class="text-base sm:text-lg font-bold text-[#003366]">Staff Login</h2>
+                                <h2 class="text-base sm:text-lg font-bold text-[#003366]">Sign In</h2>
                             </div>
                         </div>
 
                         <form class="space-y-4 sm:space-y-5" @submit.prevent="submit">
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="email">
+                                <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1.5" for="email">
                                     Email Address
                                 </label>
                                 <input
                                     id="email"
                                     v-model="form.email"
                                     type="email"
-                                    class="w-full border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366]"
+                                    class="w-full border border-gray-300 bg-gray-50 px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366]"
                                     autocomplete="username"
                                     placeholder="Enter your email"
                                     required
@@ -60,14 +64,14 @@
                             </div>
 
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="password">
+                                <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1.5" for="password">
                                     Password
                                 </label>
                                 <input
                                     id="password"
                                     v-model="form.password"
                                     type="password"
-                                    class="w-full border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366]"
+                                    class="w-full border border-gray-300 bg-gray-50 px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366]"
                                     autocomplete="current-password"
                                     placeholder="Enter your password"
                                     required
@@ -77,16 +81,16 @@
                                 </p>
                             </div>
 
-                            <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                            <label class="flex items-center gap-2.5 text-sm sm:text-xs text-gray-600 cursor-pointer min-h-[44px] sm:min-h-0">
                                 <input
                                     v-model="form.remember"
                                     type="checkbox"
-                                    class="h-4 w-4 border-gray-300 text-[#003366] focus:ring-[#003366]"
+                                    class="h-4 w-4 shrink-0 border-gray-300 text-[#003366] focus:ring-[#003366]"
                                 />
                                 Remember this device
                             </label>
 
-                            <div v-if="turnstileSiteKey">
+                            <div v-if="turnstileSiteKey" class="overflow-x-auto max-w-full">
                                 <TurnstileWidget
                                     ref="turnstileRef"
                                     :site-key="turnstileSiteKey"
@@ -101,7 +105,7 @@
 
                             <button
                                 type="submit"
-                                class="w-full bg-[#003366] text-white text-sm font-bold py-2.5 px-4 hover:bg-[#002244] transition disabled:opacity-60"
+                                class="w-full bg-[#003366] text-white text-sm font-bold py-3 sm:py-2.5 px-4 hover:bg-[#002244] transition disabled:opacity-60 min-h-[48px] sm:min-h-0"
                                 :disabled="form.processing || (turnstileSiteKey && !form['cf-turnstile-response'])"
                             >
                                 {{ form.processing ? "Signing in..." : "Login to System" }}
@@ -115,7 +119,7 @@
 
                             <Link
                                 href="/requests/new"
-                                class="block w-full text-center border border-[#003366] text-[#003366] text-sm font-semibold py-2.5 px-4 hover:bg-[#003366] hover:text-white transition"
+                                class="flex items-center justify-center w-full text-center border border-[#003366] text-[#003366] text-sm font-semibold py-3 sm:py-2.5 px-4 hover:bg-[#003366] hover:text-white transition min-h-[48px] sm:min-h-0"
                             >
                                 Continue as Guest
                             </Link>
@@ -123,17 +127,17 @@
                     </div>
 
                     <!-- Info Panel — second on mobile, left on desktop -->
-                    <div class="anim-5 space-y-5 sm:space-y-6 order-last lg:order-first">
-                        <div class="border-l-4 border-[#003366] pl-4">
-                            <p class="text-xs uppercase tracking-widest text-gray-500 font-semibold">Staff Portal</p>
-                            <h2 class="text-xl sm:text-2xl font-bold text-[#003366]">Document Management System</h2>
+                    <div class="anim-5 space-y-4 sm:space-y-6 order-last lg:order-first">
+                        <div class="border-l-4 border-[#003366] pl-3 sm:pl-4">
+                            <p class="text-[10px] sm:text-xs uppercase tracking-widest text-gray-500 font-semibold">Login Portal</p>
+                            <h2 class="text-lg sm:text-2xl font-bold text-[#003366] leading-snug">Document Management System</h2>
                         </div>
-                        <p class="text-sm text-gray-600 max-w-md">
+                        <p class="text-sm text-gray-600 max-w-md leading-relaxed">
                             Secure, track, and archive office records with real-time visibility.
                             This portal is for authorized government personnel only.
                         </p>
 
-                        <div class="bg-[#003366]/5 border border-[#003366]/20 p-4 text-xs text-gray-600 leading-relaxed">
+                        <div class="bg-[#003366]/5 border border-[#003366]/20 p-3.5 sm:p-4 text-xs text-gray-600 leading-relaxed">
                             <span class="font-bold text-[#003366]">Notice:</span> Unauthorized access to this system is prohibited
                             and may be subject to administrative and criminal penalties under applicable laws.
                         </div>
@@ -145,11 +149,13 @@
 
         <!-- Footer -->
         <footer class="anim-6 bg-[#003366] text-white border-t-4 border-[#FFD700] mt-auto">
-            <div class="mx-auto max-w-6xl px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <p class="text-xs font-bold uppercase tracking-widest text-[#FFD700]">Office of the Vice Mayor &mdash; Oas, Albay</p>
-                <div class="text-xs text-blue-200 flex flex-wrap gap-3 sm:gap-4">
-                    <span>Hotline: {{ site.hotline || '(052) 555-0198' }}</span>
-                    <span>Email: info@oas-albay.gov.ph</span>
+            <div class="mx-auto max-w-6xl px-3 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                <p class="text-[10px] sm:text-xs font-bold uppercase tracking-wider sm:tracking-widest text-[#FFD700] leading-relaxed">
+                    Office of the Vice Mayor &mdash; Oas, Albay
+                </p>
+                <div class="text-[11px] sm:text-xs text-blue-200 flex flex-col sm:flex-row flex-wrap gap-1 sm:gap-4">
+                    <span class="break-all">Hotline: {{ site.hotline || '(052) 555-0198' }}</span>
+                    <span class="break-all">Email: info@oas-albay.gov.ph</span>
                 </div>
             </div>
         </footer>
