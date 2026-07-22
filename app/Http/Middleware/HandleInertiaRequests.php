@@ -3,8 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Models\SystemSetting;
+use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Inertia\Support\Header;
+use Symfony\Component\HttpFoundation\Response;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -16,6 +19,27 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    /**
+     * Handle the incoming request.
+     *
+     * Prevents browsers from caching Inertia JSON and later serving it
+     * as a full-page document (raw JSON) when using Back/Forward.
+     */
+    public function handle(Request $request, Closure $next): Response
+    {
+        $response = parent::handle($request, $next);
+
+        $response->headers->set('Vary', Header::INERTIA.', Accept');
+
+        if ($request->header(Header::INERTIA)) {
+            $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+            $response->headers->set('Pragma', 'no-cache');
+            $response->headers->set('Expires', '0');
+        }
+
+        return $response;
+    }
 
     /**
      * Determines the current asset version.
