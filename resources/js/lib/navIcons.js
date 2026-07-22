@@ -1,0 +1,47 @@
+import {
+    Archive,
+    BarChart3,
+    ClipboardCheck,
+    FileText,
+    Inbox,
+    LayoutDashboard,
+    Route,
+    ScrollText,
+    Search,
+    Settings,
+    UserCheck,
+    Users,
+    Award,
+} from "@lucide/vue";
+
+export const navIconMap = {
+    LayoutDashboard,
+    FileText,
+    Route,
+    UserCheck,
+    Award,
+    Search,
+    Archive,
+    Users,
+    ClipboardCheck,
+    Inbox,
+    BarChart3,
+    ScrollText,
+    Settings,
+};
+
+export const navIconByHref = {
+    "/dashboard": "LayoutDashboard",
+    "/documents": "FileText",
+    "/tracking": "Route",
+    "/visitors": "UserCheck",
+    "/certificates": "Award",
+    "/search": "Search",
+    "/archive": "Archive",
+    "/users": "Users",
+    "/approvals": "ClipboardCheck",
+    "/requests": "Inbox",
+    "/reports": "BarChart3",
+    "/audit": "ScrollText",
+    "/settings": "Settings",
+};

@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.vue';
+
+@theme {
+    --font-sans:
+        "Source Sans 3", ui-sans-serif, system-ui, sans-serif,
+        "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+        "Noto Color Emoji";
+    --font-display:
+        "Merriweather", ui-serif, Georgia, Cambria, "Times New Roman", Times,
+        serif;
+}
+
+:root {
+    --dms-navy: #003366;
+    --dms-gold: #FFD700;
+}
+
+body {
+    font-family: var(--font-sans);
+    background-color: #f5f5f5;
+    color: #111827;
+}
+
+.font-display {
+    font-family: var(--font-display);
+}
+
+/* Government-style card */
+.card-shell {
+    @apply border border-gray-300 bg-white shadow-sm;
+}
+
+/* Government-style inputs */
+.soft-input {
+    @apply w-full border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366];
+}
+
+.soft-select {
+    @apply w-full border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366];
+}
+
+/* Government-style primary button */
+.soft-button {
+    @apply inline-flex items-center justify-center bg-[#003366] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#002244];
+}
+
+/* Government-style outlined button */
+.soft-button-light {
+    @apply inline-flex items-center justify-center border border-[#003366] px-4 py-2 text-sm font-semibold text-[#003366] transition hover:bg-[#003366] hover:text-white;
+}
+
+/* Government-style badge */
+.soft-chip {
+    @apply inline-flex items-center gap-1 bg-blue-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#003366];
+}
+
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-up {
+    animation: fadeUp 0.5s ease-out both;
+}
+
+.fade-up-delay-1 {
+    animation-delay: 0.1s;
+}
+
+.fade-up-delay-2 {
+    animation-delay: 0.2s;
+}
+
+/* ── Vue Sonner toast overrides ── */
+[data-sonner-toaster] {
+    --normal-bg: #fff;
+    --normal-border: #003366;
+    --normal-text: #003366;
+}
+
+[data-sonner-toast] {
+    border-radius: 0 !important;
+    font-family: inherit !important;
+    font-size: 13px !important;
+    box-shadow: 0 4px 16px rgba(0,51,102,0.15) !important;
+    border-left-width: 4px !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+    border-color: #003366 !important;
+    background: #f0f5ff !important;
+    color: #003366 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-icon] svg {
+    color: #003366 !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+    border-color: #b91c1c !important;
+    background: #fff5f5 !important;
+    color: #7f1d1d !important;
+}
+
+[data-sonner-toast] [data-close-button] {
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: 1px solid currentColor !important;
+    opacity: 0.5;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+    opacity: 1;
+}
