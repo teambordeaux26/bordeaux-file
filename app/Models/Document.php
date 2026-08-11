@@ -27,13 +27,17 @@ class Document extends Model
         'approved_at',
         'returned_at',
         'archived_at',
+        'submitted_at',
+        'released_at',
     ];
 
     protected $casts = [
-        'approved_at' => 'datetime',
-        'returned_at' => 'datetime',
-        'archived_at' => 'datetime',
-        'expires_at'  => 'datetime',
+        'approved_at'  => 'datetime',
+        'returned_at'  => 'datetime',
+        'archived_at'  => 'datetime',
+        'expires_at'   => 'datetime',
+        'submitted_at' => 'datetime',
+        'released_at'  => 'datetime',
     ];
 
     public function category(): BelongsTo

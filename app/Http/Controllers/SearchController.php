@@ -3,49 +3,65 @@
 namespace App\Http\Controllers;
 
 use App\Models\Certificate;
+use App\Models\Department;
 use App\Models\Document;
 use App\Models\DocumentRequest;
+use App\Models\User;
 use App\Models\VisitorLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class SearchController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * JSON endpoint for the top-bar global search dropdown.
+     */
+    public function suggest(Request $request)
     {
         $validated = $request->validate([
             'q' => 'nullable|string|max:255',
         ]);
 
-        $q        = trim($validated['q'] ?? '');
-        $searched = $q !== '';
-        $results  = collect();
+        $q = trim($validated['q'] ?? '');
 
-        if ($searched) {
-            $results = $results
-                ->merge($this->searchDocuments($q))
-                ->merge($this->searchCertificates($q))
-                ->merge($this->searchVisitors($q));
-
-            if ($request->user()?->role === 'admin') {
-                $results = $results->merge($this->searchRequests($q));
-            }
+        if ($q === '') {
+            return response()->json([
+                'q'       => $q,
+                'results' => [],
+            ]);
         }
 
-        $results = $results
-            ->sortByDesc('sort_date')
-            ->values()
-            ->all();
+        $results = $this->gatherResults($request, $q, 20);
 
-        return Inertia::render('Search/Index', [
-            'results'  => $results,
-            'filters'  => compact('q'),
-            'searched' => $searched,
+        return response()->json([
+            'q'       => $q,
+            'results' => $results->values()->all(),
         ]);
     }
 
-    private function searchDocuments(string $q)
+    /**
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function gatherResults(Request $request, string $q, int $limit = 20)
+    {
+        $perSource = max(5, (int) ceil($limit / 2));
+
+        $results = collect()
+            ->merge($this->searchDocuments($q, $perSource))
+            ->merge($this->searchCertificates($q, $perSource))
+            ->merge($this->searchVisitors($q, $perSource));
+
+        if ($request->user()?->role === 'admin') {
+            $results = $results
+                ->merge($this->searchRequests($q, $perSource))
+                ->merge($this->searchUsers($q, $perSource))
+                ->merge($this->searchDepartments($q, $perSource));
+        }
+
+        return $results->sortByDesc('sort_date')->values()->take($limit);
+    }
+
+    private function searchDocuments(string $q, int $limit = 50)
     {
         $statusQuery = str_replace(' ', '_', strtolower($q));
 
@@ -74,6 +90,7 @@ class SearchController extends Controller
                     });
             })
             ->latest()
+            ->limit($limit)
             ->get()
             ->map(fn ($document) => [
                 'key'       => "document-{$document->id}",
@@ -93,7 +110,7 @@ class SearchController extends Controller
             ]);
     }
 
-    private function searchCertificates(string $q)
+    private function searchCertificates(string $q, int $limit = 50)
     {
         return Certificate::with(['visitorLog', 'issuer'])
             ->where(function (Builder $builder) use ($q) {
@@ -113,6 +130,7 @@ class SearchController extends Controller
                     });
             })
             ->latest()
+            ->limit($limit)
             ->get()
             ->map(fn ($certificate) => [
                 'key'       => "certificate-{$certificate->id}",
@@ -131,7 +149,7 @@ class SearchController extends Controller
             ]);
     }
 
-    private function searchVisitors(string $q)
+    private function searchVisitors(string $q, int $limit = 50)
     {
         return VisitorLog::query()
             ->where(function (Builder $builder) use ($q) {
@@ -142,6 +160,7 @@ class SearchController extends Controller
                     ->orWhere('address', 'like', "%{$q}%");
             })
             ->latest('time_in')
+            ->limit($limit)
             ->get()
             ->map(fn ($visitor) => [
                 'key'       => "visitor-{$visitor->id}",
@@ -159,7 +178,7 @@ class SearchController extends Controller
             ]);
     }
 
-    private function searchRequests(string $q)
+    private function searchRequests(string $q, int $limit = 50)
     {
         $statusQuery = str_replace(' ', '_', strtolower($q));
 
@@ -176,6 +195,7 @@ class SearchController extends Controller
                     ->orWhereRaw("REPLACE(status, '_', ' ') LIKE ?", ["%{$q}%"]);
             })
             ->latest()
+            ->limit($limit)
             ->get()
             ->map(fn ($request) => [
                 'key'       => "request-{$request->id}",
@@ -191,6 +211,65 @@ class SearchController extends Controller
                 'url'       => route('requests.index'),
                 'external'  => false,
                 'sort_date' => $request->created_at->timestamp,
+            ]);
+    }
+
+    private function searchUsers(string $q, int $limit = 50)
+    {
+        return User::query()
+            ->where(function (Builder $builder) use ($q) {
+                $builder->where('name', 'like', "%{$q}%")
+                    ->orWhere('email', 'like', "%{$q}%")
+                    ->orWhere('department', 'like', "%{$q}%")
+                    ->orWhere('position', 'like', "%{$q}%")
+                    ->orWhere('role', 'like', "%{$q}%")
+                    ->orWhere('status', 'like', "%{$q}%")
+                    ->orWhere('phone', 'like', "%{$q}%");
+            })
+            ->latest()
+            ->limit($limit)
+            ->get()
+            ->map(fn ($user) => [
+                'key'       => "user-{$user->id}",
+                'type'      => 'User',
+                'title'     => $user->name,
+                'subtitle'  => implode(' · ', array_filter([
+                    $user->email,
+                    $user->role,
+                    $user->department,
+                    $user->position,
+                ])),
+                'status'    => ucfirst($user->status ?? 'active'),
+                'url'       => route('users.index'),
+                'external'  => false,
+                'sort_date' => $user->created_at?->timestamp ?? 0,
+            ]);
+    }
+
+    private function searchDepartments(string $q, int $limit = 50)
+    {
+        return Department::query()
+            ->where(function (Builder $builder) use ($q) {
+                $builder->where('name', 'like', "%{$q}%")
+                    ->orWhere('code', 'like', "%{$q}%")
+                    ->orWhere('description', 'like', "%{$q}%")
+                    ->orWhere('status', 'like', "%{$q}%");
+            })
+            ->latest()
+            ->limit($limit)
+            ->get()
+            ->map(fn ($department) => [
+                'key'       => "department-{$department->id}",
+                'type'      => 'Department',
+                'title'     => $department->name,
+                'subtitle'  => implode(' · ', array_filter([
+                    $department->code,
+                    $department->description,
+                ])),
+                'status'    => ucfirst($department->status ?? 'active'),
+                'url'       => route('departments.index'),
+                'external'  => false,
+                'sort_date' => $department->created_at?->timestamp ?? 0,
             ]);
     }
 }

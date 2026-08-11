@@ -59,8 +59,6 @@
         <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
             <TopBar />
             <main class="flex-1 overflow-y-auto px-6 py-6 pb-10">
-                <!-- Global flash banners — auto-dismiss after 5 s -->
-                <FlashBanner />
                 <slot />
             </main>
         </div>
@@ -70,7 +68,6 @@
 <script setup>
 import { computed } from "vue";
 import { usePage } from "@inertiajs/vue3";
-import FlashBanner from "../Components/FlashBanner.vue";
 import SidebarNav from "../Components/SidebarNav.vue";
 import TopBar from "../Components/TopBar.vue";
 import { useSidebar } from "../composables/useSidebar.js";
@@ -79,14 +76,15 @@ const page = usePage();
 const { collapsed } = useSidebar();
 const role = computed(() => page.props.auth?.user?.role ?? "guest");
 const employeePages = computed(() => page.props.employeePages ?? null);
+const returnedCount = computed(() => page.props.returnedCount ?? 0);
 
 const pageKeyByHref = {
     "/dashboard": "dashboard",
     "/documents": "documents",
-    "/tracking": "tracking",
+    "/documents/returned": "documents",
+    "/workflow": "workflow",
     "/visitors": "visitors",
     "/certificates": "certificates",
-    "/search": "search",
     "/archive": "archive",
 };
 
@@ -104,10 +102,15 @@ const baseSections = computed(() => [
         items: filterNavItems([
             { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
             { label: "Documents", href: "/documents", icon: "FileText" },
-            { label: "Tracking", href: "/tracking", icon: "Route" },
+            { label: "Workflow", href: "/workflow", icon: "GitBranch" },
+            {
+                label: "Returned to Me",
+                href: "/documents/returned",
+                icon: "RotateCcw",
+                badge: returnedCount.value > 0 ? returnedCount.value : null,
+            },
             { label: "Visitors Log", href: "/visitors", icon: "UserCheck" },
             { label: "Certificates", href: "/certificates", icon: "Award" },
-            { label: "Search", href: "/search", icon: "Search" },
             { label: "Archive", href: "/archive", icon: "Archive" },
         ]),
     },
@@ -117,6 +120,7 @@ const adminSection = {
     label: "Administration",
     items: [
         { label: "User Management", href: "/users", icon: "Users" },
+        { label: "Departments", href: "/departments", icon: "Building2" },
         { label: "Review & Approval", href: "/approvals", icon: "ClipboardCheck" },
         { label: "Request Reviews", href: "/requests", icon: "Inbox" },
         { label: "Reports", href: "/reports", icon: "BarChart3" },

@@ -17,8 +17,9 @@ class ArchiveController extends Controller
         $archives = Document::with(['category', 'submitter'])
             ->where('status', 'archived')
             ->latest('archived_at')
-            ->get()
-            ->map(fn($d) => [
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn ($d) => [
                 'id'       => $d->id,
                 'tracking' => $d->tracking_number,
                 'title'    => $d->title,

@@ -6,14 +6,15 @@ use App\Http\Controllers\ApprovalsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PublicDocumentController;
 use App\Http\Controllers\RequestController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorController;
+use App\Http\Controllers\WorkflowController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -34,12 +35,12 @@ Route::middleware(['auth', 'role:admin,employee', 'employee.page'])->group(funct
     // Documents
     Route::get('/documents',                      [DocumentController::class, 'index'])->name('documents.index');
     Route::get('/documents/upload',               [DocumentController::class, 'uploadForm'])->name('documents.upload');
+    Route::get('/documents/returned',             [DocumentController::class, 'returnedIndex'])->name('documents.returned');
     Route::post('/documents',                     [DocumentController::class, 'store'])->name('documents.store');
+    Route::get('/documents/{document}/edit',      [DocumentController::class, 'edit'])->name('documents.edit');
+    Route::put('/documents/{document}',           [DocumentController::class, 'update'])->name('documents.update');
     Route::get('/documents/{document}',           [DocumentController::class, 'show'])->name('documents.show');
-    Route::get('/documents/{document}/file',        [DocumentController::class, 'file'])->name('documents.file');
-
-    // Tracking
-    Route::get('/tracking', [TrackingController::class, 'index'])->name('tracking.index');
+    Route::get('/documents/{document}/file',      [DocumentController::class, 'file'])->name('documents.file');
 
     // Visitors
     Route::get('/visitors',  [VisitorController::class, 'index'])->name('visitors.index');
@@ -50,16 +51,28 @@ Route::middleware(['auth', 'role:admin,employee', 'employee.page'])->group(funct
     Route::post('/certificates',                       [CertificateController::class, 'generate'])->name('certificates.generate');
     Route::get('/certificates/{certificate}/download', [CertificateController::class, 'download'])->name('certificates.download');
 
-    // Search
-    Route::get('/search', [SearchController::class, 'index'])->name('search.index');
+    // Global search (top-bar suggest only)
+    Route::get('/search/suggest', [SearchController::class, 'suggest'])->name('search.suggest');
 
     // Archive
     Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
+
+    // Workflow (visible to admin + employees; per-action rules are enforced in the controller)
+    Route::get('/workflow',                     [WorkflowController::class, 'index'])->name('workflow.index');
+    Route::put('/workflow/{document}/advance',  [WorkflowController::class, 'advance'])->name('workflow.advance');
 });
 
 Route::middleware(['auth', 'role:admin'])->group(function () {
     // Users
-    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/users',              [UserController::class, 'index'])->name('users.index');
+    Route::post('/users',             [UserController::class, 'store'])->name('users.store');
+    Route::put('/users/{user}',       [UserController::class, 'update'])->name('users.update');
+
+    // Departments
+    Route::get('/departments',                 [DepartmentController::class, 'index'])->name('departments.index');
+    Route::post('/departments',                [DepartmentController::class, 'store'])->name('departments.store');
+    Route::put('/departments/{department}',    [DepartmentController::class, 'update'])->name('departments.update');
+    Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
 
     // Approvals
     Route::get('/approvals',                             [ApprovalsController::class, 'index'])->name('approvals.index');
@@ -105,7 +118,3 @@ Route::get('/requests/{documentRequest}/certificate',  [RequestController::class
 Route::post('/requests/{documentRequest}/certificate', [RequestController::class, 'issueGuestCertificate'])->name('requests.certificate.issue');
 Route::get('/guest/certificates/{certificate}',         [RequestController::class, 'guestCertificatePreview'])->name('guest.certificate.preview');
 Route::get('/guest/certificates/{certificate}/download',[RequestController::class, 'guestCertificateDownload'])->name('guest.certificate.download');
-
-Route::get('/tracking/status', function () {
-    return Inertia::render('Tracking/Guest');
-})->name('tracking.guest');

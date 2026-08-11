@@ -51,10 +51,10 @@ class SystemSetting extends Model
         return [
             'dashboard'    => 'Dashboard',
             'documents'    => 'Documents',
-            'tracking'     => 'Tracking',
+            'workflow'     => 'Workflow',
             'visitors'     => 'Visitors Log',
             'certificates' => 'Certificates',
-            'search'       => 'Search',
+            'search'       => 'Global Search',
             'archive'      => 'Archive',
         ];
     }
@@ -79,13 +79,17 @@ class SystemSetting extends Model
             'documents.store'       => 'documents',
             'documents.show'        => 'documents',
             'documents.file'        => 'documents',
-            'tracking.index'        => 'tracking',
+            'documents.returned'    => 'documents',
+            'documents.edit'        => 'documents',
+            'documents.update'      => 'documents',
+            'workflow.index'        => 'workflow',
+            'workflow.advance'      => 'workflow',
             'visitors.index'        => 'visitors',
             'visitors.store'        => 'visitors',
             'certificates.index'    => 'certificates',
             'certificates.generate' => 'certificates',
             'certificates.download' => 'certificates',
-            'search.index'          => 'search',
+            'search.suggest'        => 'search',
             'archive.index'         => 'archive',
         ];
     }

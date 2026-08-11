@@ -106,55 +106,59 @@
                 subtitle="Latest certificates created for office visitors."
             >
                 <p
-                    v-if="certificates.length === 0"
+                    v-if="!certificates.total"
                     class="text-sm text-slate-500 py-4 text-center"
                 >
                     No certificates issued yet.
                 </p>
-                <div v-else class="overflow-hidden border border-slate-200">
-                    <table class="w-full text-left text-sm">
-                        <thead
-                            class="bg-slate-100/80 text-xs uppercase tracking-[0.3em] text-slate-500"
-                        >
-                            <tr>
-                                <th class="px-4 py-3">Certificate No.</th>
-                                <th class="px-4 py-3">Visitor</th>
-                                <th class="px-4 py-3">Purpose</th>
-                                <th class="px-4 py-3">Issued</th>
-                                <th class="px-4 py-3 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200 bg-white">
-                            <tr v-for="cert in certificates" :key="cert.id">
-                                <td
-                                    class="px-4 py-3 font-semibold text-slate-900"
-                                >
-                                    {{ cert.number }}
-                                </td>
-                                <td class="px-4 py-3 text-slate-600">
-                                    {{ cert.name }}
-                                </td>
-                                <td class="px-4 py-3 text-slate-600">
-                                    {{ cert.purpose }}
-                                </td>
-                                <td class="px-4 py-3 text-slate-600">
-                                    {{ cert.issued }}
-                                </td>
-                                <td class="px-4 py-3 text-right">
-                                    <a
-                                        :href="cert.download_url"
-                                        target="_blank"
-                                        class="soft-button-light inline-flex items-center gap-1.5"
+                <div v-else>
+                    <div class="overflow-hidden border border-slate-200">
+                        <table class="w-full text-left text-sm">
+                            <thead
+                                class="bg-slate-100/80 text-xs uppercase tracking-[0.3em] text-slate-500"
+                            >
+                                <tr>
+                                    <th class="px-4 py-3">Certificate No.</th>
+                                    <th class="px-4 py-3">Visitor</th>
+                                    <th class="px-4 py-3">Purpose</th>
+                                    <th class="px-4 py-3">Issued</th>
+                                    <th class="px-4 py-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 bg-white">
+                                <tr v-for="cert in certRows" :key="cert.id">
+                                    <td
+                                        class="px-4 py-3 font-semibold text-slate-900"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
-                                        </svg>
-                                        Download
-                                    </a>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                        {{ cert.number }}
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600">
+                                        {{ cert.name }}
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600">
+                                        {{ cert.purpose }}
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600">
+                                        {{ cert.issued }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <a
+                                            :href="cert.download_url"
+                                            target="_blank"
+                                            class="soft-button-light inline-flex items-center gap-1.5"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/>
+                                            </svg>
+                                            Download
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <Pagination :paginator="certificates" />
                 </div>
             </SectionCard>
         </div>
@@ -167,12 +171,15 @@ import { Head, router, useForm } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
+import Pagination from "../../Components/Pagination.vue";
 
 const props = defineProps({
-    certificates: { type: Array, default: () => [] },
+    certificates: { type: Object, default: () => ({ data: [], total: 0 }) },
     visitors: { type: Array, default: () => [] },
     selectedDate: { type: String, default: () => new Date().toISOString().slice(0, 10) },
 });
+
+const certRows = computed(() => props.certificates?.data ?? []);
 
 const showForm = ref(false);
 const visitDate = ref(props.selectedDate);

@@ -55,7 +55,7 @@ import { computed } from "vue";
 import { Link, usePage } from "@inertiajs/vue3";
 import { navIconByHref, navIconMap } from "../lib/navIcons.js";
 
-defineProps({
+const props = defineProps({
     sections: {
         type: Array,
         default: () => [],
@@ -67,13 +67,31 @@ defineProps({
 });
 
 const page = usePage();
-const currentPath = computed(() => page.url);
+const currentPath = computed(() => (page.url || "").split("?")[0]);
+
+const allHrefs = computed(() =>
+    props.sections.flatMap((section) =>
+        (section.items || []).map((item) => item.href).filter(Boolean)
+    )
+);
 
 const isActive = (href) => {
+    const path = currentPath.value;
+
     if (href === "/dashboard") {
-        return currentPath.value === href || currentPath.value === "/";
+        return path === href || path === "/";
     }
-    return currentPath.value.startsWith(href);
+
+    // Prefer the longest matching nav href so /documents/returned
+    // does not also highlight /documents.
+    const matches = allHrefs.value.filter(
+        (candidate) => path === candidate || path.startsWith(`${candidate}/`)
+    );
+
+    if (matches.length === 0) return false;
+
+    const best = matches.reduce((a, b) => (a.length >= b.length ? a : b));
+    return best === href;
 };
 
 function resolveIcon(item) {

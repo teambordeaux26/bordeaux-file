@@ -20,8 +20,9 @@ class CertificateController extends Controller
 
         $certificates = Certificate::with(['visitorLog', 'issuer'])
             ->latest()
-            ->get()
-            ->map(fn($c) => [
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn ($c) => [
                 'id'      => $c->id,
                 'number'  => $c->certificate_no,
                 'name'    => $c->visitorLog?->visitor_name ?? '—',

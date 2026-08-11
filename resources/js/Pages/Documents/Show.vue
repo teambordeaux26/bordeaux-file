@@ -8,6 +8,7 @@
                 :subtitle="`${document.tracking} · ${document.category}`"
             >
                 <template #actions>
+                    <Link href="/workflow" class="soft-button-light">Back to Workflow</Link>
                     <Link href="/documents" class="soft-button-light">Back to List</Link>
                     <a
                         v-if="download_url"

@@ -96,6 +96,7 @@ body {
     font-size: 13px !important;
     box-shadow: 0 4px 16px rgba(0,51,102,0.15) !important;
     border-left-width: 4px !important;
+    padding-right: 2.25rem !important;
 }
 
 [data-sonner-toast][data-type="success"] {
@@ -115,12 +116,80 @@ body {
 }
 
 [data-sonner-toast] [data-close-button] {
+    left: unset !important;
+    right: 8px !important;
+    top: 8px !important;
+    bottom: unset !important;
+    transform: none !important;
     border-radius: 0 !important;
-    background: transparent !important;
+    background: #fff !important;
     border: 1px solid currentColor !important;
-    opacity: 0.5;
+    opacity: 0.55;
+    width: 20px !important;
+    height: 20px !important;
 }
 
 [data-sonner-toast] [data-close-button]:hover {
     opacity: 1;
+    background: #fff !important;
+}
+
+/* ── Custom scrollbar ── */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 51, 102, 0.35) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 51, 102, 0.35);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 51, 102, 0.7);
+    background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Sidebar scrollbar — subtle light gray on navy */
+aside.bg-\[\#003366\],
+aside.bg-\[\#003366\] * {
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+aside.bg-\[\#003366\] *::-webkit-scrollbar-thumb,
+aside.bg-\[\#003366\]::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.25);
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+aside.bg-\[\#003366\] *::-webkit-scrollbar-thumb:hover,
+aside.bg-\[\#003366\]::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.45);
+    background-clip: content-box;
+}
+
+/* Utility: hide scrollbar completely (keeps scrollability) */
+.no-scrollbar {
+    scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
 }

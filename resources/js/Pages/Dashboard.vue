@@ -115,7 +115,7 @@ defineProps({
 const quickActions = [
     { label: "Log Visitor",          note: "Front desk", href: "/visitors" },
     { label: "Generate Certificate", note: "COA module", href: "/certificates" },
-    { label: "Track Document",       note: "Live status", href: "/tracking" },
-    { label: "Search Records",       note: "Archives",    href: "/search" },
+    { label: "Workflow Board",       note: "Stages",     href: "/workflow" },
+    { label: "Returned to Me",       note: "Revisions",  href: "/documents/returned" },
 ];
 </script>

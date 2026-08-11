@@ -25,10 +25,12 @@
                         v-model="search"
                         class="soft-input !w-auto min-w-[12rem] flex-1 max-w-xs"
                         placeholder="Search title or tracking no."
+                        @keyup.enter="applyFilters"
                     />
                     <select
                         v-model="filterCategory"
                         class="soft-select !w-48 shrink-0"
+                        @change="applyFilters"
                     >
                         <option value="">All categories</option>
                         <option
@@ -42,6 +44,7 @@
                     <select
                         v-model="filterStatus"
                         class="soft-select !w-40 shrink-0"
+                        @change="applyFilters"
                     >
                         <option value="">All statuses</option>
                         <option>Pending</option>
@@ -49,6 +52,13 @@
                         <option>Approved</option>
                         <option>Returned</option>
                     </select>
+                    <button
+                        type="button"
+                        class="soft-button-light text-xs"
+                        @click="applyFilters"
+                    >
+                        Search
+                    </button>
                 </div>
 
                 <!-- Table -->
@@ -71,7 +81,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
-                            <tr v-if="filtered.length === 0">
+                            <tr v-if="rows.length === 0">
                                 <td
                                     colspan="10"
                                     class="px-4 py-8 text-center text-sm text-gray-400"
@@ -80,7 +90,7 @@
                                 </td>
                             </tr>
                             <tr
-                                v-for="doc in filtered"
+                                v-for="doc in rows"
                                 :key="doc.id"
                                 class="hover:bg-blue-50/40 transition"
                             >
@@ -166,44 +176,56 @@
                     </table>
                 </div>
 
-                <p class="mt-2 text-xs text-gray-400">
-                    Showing {{ filtered.length }} of
-                    {{ documents.length }} record(s).
-                </p>
+                <Pagination :paginator="documents" />
             </SectionCard>
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
-import { Head, Link } from "@inertiajs/vue3";
+import { computed, ref, watch } from "vue";
+import { Head, Link, router } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
+import Pagination from "../../Components/Pagination.vue";
 
 const props = defineProps({
-    documents: { type: Array, default: () => [] },
+    documents: { type: Object, default: () => ({ data: [] }) },
     categories: { type: Array, default: () => [] },
+    filters: {
+        type: Object,
+        default: () => ({ q: "", category: "", status: "" }),
+    },
 });
 
-const search = ref("");
-const filterCategory = ref("");
-const filterStatus = ref("");
+const rows = computed(() => props.documents?.data ?? []);
 
-const filtered = computed(() => {
-    return props.documents.filter((doc) => {
-        const matchSearch =
-            !search.value ||
-            doc.title.toLowerCase().includes(search.value.toLowerCase()) ||
-            doc.tracking.toLowerCase().includes(search.value.toLowerCase());
-        const matchCat =
-            !filterCategory.value || doc.category === filterCategory.value;
-        const matchStat =
-            !filterStatus.value || doc.status === filterStatus.value;
-        return matchSearch && matchCat && matchStat;
-    });
-});
+const search = ref(props.filters.q ?? "");
+const filterCategory = ref(props.filters.category ?? "");
+const filterStatus = ref(props.filters.status ?? "");
+
+watch(
+    () => props.filters,
+    (value) => {
+        search.value = value?.q ?? "";
+        filterCategory.value = value?.category ?? "";
+        filterStatus.value = value?.status ?? "";
+    },
+    { deep: true }
+);
+
+function applyFilters() {
+    router.get(
+        "/documents",
+        {
+            q: search.value || undefined,
+            category: filterCategory.value || undefined,
+            status: filterStatus.value || undefined,
+        },
+        { preserveState: true, preserveScroll: true, replace: true }
+    );
+}
 
 const statusClass = (status) => {
     const map = {

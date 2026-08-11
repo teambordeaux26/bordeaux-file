@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Document;
 use App\Models\SystemSetting;
 use Closure;
 use Illuminate\Http\Request;
@@ -79,10 +80,31 @@ class HandleInertiaRequests extends Middleware
             'employeePages' => fn () => $request->user()?->role === 'employee'
                 ? ($settings->employee_pages ?? SystemSetting::defaultEmployeePages())
                 : null,
+            'returnedCount' => fn () => $this->returnedCountFor($request),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),
             ],
         ];
+    }
+
+    /**
+     * Number of documents currently returned to the signed-in user.
+     * Admins see the total across all owners.
+     */
+    protected function returnedCountFor(Request $request): int
+    {
+        $user = $request->user();
+        if (! $user) {
+            return 0;
+        }
+
+        $query = Document::where('status', 'returned');
+
+        if ($user->role !== 'admin') {
+            $query->where('submitted_by', $user->id);
+        }
+
+        return $query->count();
     }
 }
