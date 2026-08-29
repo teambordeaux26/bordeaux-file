@@ -110,19 +110,6 @@
                             >
                                 {{ form.processing ? "Signing in..." : "Login to System" }}
                             </button>
-
-                            <div class="relative flex items-center gap-3 text-xs text-gray-400">
-                                <div class="flex-1 border-t border-gray-200"></div>
-                                <span>or</span>
-                                <div class="flex-1 border-t border-gray-200"></div>
-                            </div>
-
-                            <Link
-                                href="/requests/new"
-                                class="flex items-center justify-center w-full text-center border border-[#003366] text-[#003366] text-sm font-semibold py-3 sm:py-2.5 px-4 hover:bg-[#003366] hover:text-white transition min-h-[48px] sm:min-h-0"
-                            >
-                                Continue as Guest
-                            </Link>
                         </form>
                     </div>
 
