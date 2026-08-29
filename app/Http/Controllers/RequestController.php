@@ -7,19 +7,25 @@ use App\Mail\RequestCompletedMail;
 use App\Models\AuditLog;
 use App\Models\Certificate;
 use App\Models\DocumentRequest;
+use App\Models\RequestType;
+use App\Rules\OasBarangayAddress;
 use App\Services\CertificateIssuanceService;
 use App\Services\CertificatePdfService;
+use App\Services\CertificateSignatureService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class RequestController extends Controller
 {
     public function create()
     {
-        return Inertia::render('Requests/Create');
+        return Inertia::render('Requests/Create', [
+            'requestTypes' => RequestType::activeOptions(),
+        ]);
     }
 
     public function store(Request $request)
@@ -28,19 +34,40 @@ class RequestController extends Controller
             'requester_name'    => 'required|string|max:255',
             'requester_email'   => 'required|email|max:255',
             'requester_phone'   => 'nullable|string|max:30',
-            'requester_address' => 'nullable|string|max:500',
-            'request_type'      => 'required|in:Certificate of Appearance,Document Copy,Meeting Request,Other',
+            'requester_address' => ['required', 'string', 'max:500', new OasBarangayAddress],
+            'request_type_id'   => [
+                'required',
+                Rule::exists('request_types', 'id')->where(fn ($query) => $query->where('is_active', true)),
+            ],
             'details'           => 'nullable|string|max:2000',
         ]);
+
+        $type = RequestType::query()
+            ->where('id', $validated['request_type_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (! $type) {
+            return back()->withErrors([
+                'request_type_id' => 'Select an available request type.',
+            ]);
+        }
 
         $year     = now()->year;
         $count    = DocumentRequest::whereYear('created_at', $year)->count() + 1;
         $tracking = 'REQ-' . $year . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
         DocumentRequest::create([
-            ...$validated,
-            'tracking_number' => $tracking,
-            'status'          => 'pending',
+            'requester_name'    => $validated['requester_name'],
+            'requester_email'   => $validated['requester_email'],
+            'requester_phone'   => $validated['requester_phone'] ?? null,
+            'requester_address' => $validated['requester_address'],
+            'request_type_id'   => $type->id,
+            'request_type'      => $type->name,
+            'purpose'           => $type->purpose,
+            'details'           => $validated['details'] ?? null,
+            'tracking_number'   => $tracking,
+            'status'            => 'pending',
         ]);
 
         return redirect()->route('requests.status', ['tracking' => $tracking]);
@@ -48,29 +75,34 @@ class RequestController extends Controller
 
     // ── Admin ──────────────────────────────────────────────────────────────
 
-    public function adminIndex()
+    public function adminIndex(CertificateSignatureService $signatures)
     {
-        $requests = DocumentRequest::with('processor')
+        $requests = DocumentRequest::with(['processor', 'type'])
             ->latest()
             ->get()
             ->map(fn($r) => [
-                'id'           => $r->id,
-                'tracking'     => $r->tracking_number,
-                'name'         => $r->requester_name,
-                'email'        => $r->requester_email ?? '—',
-                'phone'        => $r->requester_phone ?? '—',
-                'type'         => $r->request_type,
-                'details'      => $r->details,
-                'status'       => $r->status,
-                'has_file'     => (bool) $r->response_file_path,
-                'file_name'    => $r->response_file_name,
-                'email_sent'   => (bool) $r->email_sent_at,
-                'submitted_at' => $r->created_at->format('M d, Y'),
-                'processed_at' => $r->processed_at?->format('M d, Y'),
-                'processed_by' => $r->processor?->name,
+                'id'                   => $r->id,
+                'tracking'             => $r->tracking_number,
+                'name'                 => $r->requester_name,
+                'email'                => $r->requester_email ?? '—',
+                'phone'                => $r->requester_phone ?? '—',
+                'type'                 => $r->request_type,
+                'purpose'              => $r->connectedPurpose(),
+                'issues_certificate'   => $r->issuesCertificate(),
+                'details'              => $r->details,
+                'status'               => $r->status,
+                'has_file'             => (bool) $r->response_file_path,
+                'file_name'            => $r->response_file_name,
+                'email_sent'           => (bool) $r->email_sent_at,
+                'submitted_at'         => $r->created_at->format('M d, Y'),
+                'processed_at'         => $r->processed_at?->format('M d, Y'),
+                'processed_by'         => $r->processor?->name,
             ]);
 
-        return Inertia::render('Requests/Admin', compact('requests'));
+        return Inertia::render('Requests/Admin', [
+            'requests' => $requests,
+            'signer'   => $signatures->payloadForUser(Auth::user()),
+        ]);
     }
 
     public function adminUpdateStatus(Request $request, DocumentRequest $documentRequest)
@@ -87,7 +119,7 @@ class RequestController extends Controller
 
         $label = match ($validated['status']) {
             'under_review' => 'marked as Under Review',
-            'rejected'     => 'rejected',
+            'rejected'     => 'disapproved',
             default        => 'updated',
         };
 
@@ -102,11 +134,15 @@ class RequestController extends Controller
             ->with('success', "Request {$documentRequest->tracking_number} {$label}.");
     }
 
-    public function adminComplete(Request $request, DocumentRequest $documentRequest, CertificateIssuanceService $issuanceService)
-    {
+    public function adminComplete(
+        Request $request,
+        DocumentRequest $documentRequest,
+        CertificateIssuanceService $issuanceService,
+        CertificateSignatureService $signatures
+    ) {
         abort_if($documentRequest->status !== 'under_review', 403, 'Only requests under review can be completed.');
 
-        $isCertificate = $documentRequest->request_type === 'Certificate of Appearance';
+        $isCertificate = $documentRequest->issuesCertificate();
 
         if (! $documentRequest->requester_email) {
             return back()->withErrors([
@@ -115,7 +151,7 @@ class RequestController extends Controller
         }
 
         if ($isCertificate) {
-            return $this->completeCertificateRequest($request, $documentRequest, $issuanceService);
+            return $this->completeCertificateRequest($request, $documentRequest, $issuanceService, $signatures);
         }
 
         $request->validate([
@@ -167,9 +203,24 @@ class RequestController extends Controller
     private function completeCertificateRequest(
         Request $request,
         DocumentRequest $documentRequest,
-        CertificateIssuanceService $issuanceService
+        CertificateIssuanceService $issuanceService,
+        CertificateSignatureService $signatures
     ) {
-        $certificate = $issuanceService->issueFromDocumentRequest($documentRequest, Auth::id());
+        $user = $request->user();
+        $hasSaved = $signatures->hasSavedSignature($user);
+
+        $signer = $request->validate([
+            'signing_name'  => 'required|string|max:255',
+            'signing_title' => 'required|string|max:255',
+            'signature'     => [Rule::requiredIf(! $hasSaved), 'nullable', 'string'],
+        ]);
+
+        $certificate = $issuanceService->issueFromDocumentRequest(
+            $documentRequest,
+            $user->id,
+            null,
+            $signer
+        );
         $stored = $issuanceService->storePdf($certificate);
 
         $documentRequest->update([
@@ -237,7 +288,7 @@ class RequestController extends Controller
         $notFound = false;
 
         if ($tracking) {
-            $doc = DocumentRequest::where('tracking_number', strtoupper(trim($tracking)))->first();
+            $doc = DocumentRequest::with('type')->where('tracking_number', strtoupper(trim($tracking)))->first();
 
             if ($doc) {
                 $result = [
@@ -247,6 +298,8 @@ class RequestController extends Controller
                     'requester_phone'   => $doc->requester_phone,
                     'requester_address' => $doc->requester_address,
                     'request_type'      => $doc->request_type,
+                    'purpose'           => $doc->connectedPurpose(),
+                    'issues_certificate'=> $doc->issuesCertificate(),
                     'details'           => $doc->details,
                     'status'            => $doc->status,
                     'submitted_at'      => $doc->created_at->format('M d, Y'),
@@ -280,10 +333,16 @@ class RequestController extends Controller
 
     public function showCertificateForm(DocumentRequest $documentRequest)
     {
+        abort_unless(
+            $documentRequest->issuesCertificate(),
+            403,
+            'A certificate can only be issued for completed certificate requests.'
+        );
+
         abort_if(
             $documentRequest->status !== 'completed',
             403,
-            'A Certificate of Appearance can only be issued for completed requests.'
+            'A certificate can only be issued for completed requests.'
         );
 
         if ($documentRequest->certificate_id) {
@@ -298,6 +357,7 @@ class RequestController extends Controller
                 'phone'   => $documentRequest->requester_phone ?? '',
                 'address' => $documentRequest->requester_address ?? '',
                 'type'    => $documentRequest->request_type,
+                'purpose' => $documentRequest->connectedPurpose(),
             ],
         ]);
     }
@@ -307,6 +367,7 @@ class RequestController extends Controller
         DocumentRequest $documentRequest,
         CertificateIssuanceService $issuanceService
     ) {
+        abort_unless($documentRequest->issuesCertificate(), 403);
         abort_if($documentRequest->status !== 'completed', 403);
 
         if ($documentRequest->certificate_id) {
@@ -316,7 +377,7 @@ class RequestController extends Controller
         $validated = $request->validate([
             'visitor_name'  => 'required|string|max:255',
             'visitor_phone' => 'nullable|string|max:30',
-            'address'       => 'required|string|max:500',
+            'address'       => ['required', 'string', 'max:500', new OasBarangayAddress],
             'purpose'       => 'required|string|max:255',
         ]);
 

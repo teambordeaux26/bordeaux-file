@@ -427,7 +427,7 @@ const hasActiveFilters = computed(
 );
 
 function matches(doc) {
-    if (filters.category_id !== null && doc.category_id !== filters.category_id) return false;
+    if (filters.category_id !== null && doc.category_id !== filters.category_id && doc.category_parent_id !== filters.category_id) return false;
     if (filters.priority !== null && doc.priority !== filters.priority) return false;
     if (filters.owner_id !== null && doc.owner_id !== filters.owner_id) return false;
     const q = filters.q.trim().toLowerCase();

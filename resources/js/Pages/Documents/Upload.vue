@@ -66,19 +66,11 @@
                         <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">{{ form.errors.title }}</p>
                     </div>
 
-                    <!-- Category -->
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="category">
-                            Category
-                        </label>
-                        <select id="category" v-model="form.category_id" class="soft-select">
-                            <option :value="null">— Select category —</option>
-                            <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                                {{ cat.name }}
-                            </option>
-                        </select>
-                        <p v-if="form.errors.category_id" class="mt-1 text-xs text-red-600">{{ form.errors.category_id }}</p>
-                    </div>
+                    <CategoryFields
+                        v-model="form.category_id"
+                        :categories="categories"
+                        :error="form.errors.category_id"
+                    />
 
                     <!-- Priority -->
                     <div>
@@ -171,6 +163,7 @@ import { Head, Link, useForm } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
+import CategoryFields from "../../Components/CategoryFields.vue";
 
 const props = defineProps({
     categories:       { type: Array, default: () => [] },
@@ -182,7 +175,7 @@ const form = useForm({
     title:          '',
     category_id:    null,
     priority:       'Standard',
-    retention_days: 365,
+    retention_days: 7,
     description:    '',
     file:           null,
 });

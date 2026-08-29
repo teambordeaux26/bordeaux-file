@@ -67,8 +67,8 @@ html, body {
 .rep  { font-size: 10.5pt;  line-height: 1.7; color: #222; }
 .muni { font-size: 12pt;   font-weight: 900; text-transform: uppercase;
         letter-spacing: 3px; margin-top: 1.5mm; }
-.sb   { font-size: 15pt;   font-weight: 900; text-transform: uppercase;
-        letter-spacing: 3px; margin: 1.5mm 0 1mm; }
+.sb   { font-size: 12pt;   font-weight: 900; text-transform: uppercase;
+        letter-spacing: 1px; margin: 1.5mm 0 1mm; }
 .title-section {
     text-align: center;
     margin-top: -3mm;
@@ -122,8 +122,15 @@ html, body {
 .fill-month   { min-width: 36mm; }
 
 /* ── Signature ── */
-.stbl { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 35mm; }
+.stbl { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 18mm; }
 .sig-right { text-align: center; width: 50%; vertical-align: bottom; }
+.sig-image {
+    display: block;
+    height: 22mm;
+    max-width: 70mm;
+    margin: 0 auto -7mm;
+}
+.sig-image-spacer { height: 15mm; }
 .sig-name {
     font-size:      11.5pt;
     font-weight:    bold;
@@ -200,7 +207,7 @@ html, body {
                                 <div class="rep">Republic of the Philippines</div>
                                 <div class="rep">Province of Albay</div>
                                 <div class="muni">Municipality of Oas</div>
-                                <div class="sb">Sangguniang Bayan</div>
+                                <div class="sb">Office of the Vice Mayor</div>
                             </td>
                         </tr>
                     </table>
@@ -252,8 +259,13 @@ html, body {
                 <tr>
                     <td style="width:50%;"></td>
                     <td class="sig-right">
-                        <div class="sig-name">Wilma R. Gamboa</div>
-                        <div class="sig-title">Secretary to the Sanggunian</div>
+                        @if(!empty($signer_signature))
+                        <img class="sig-image" src="{{ $signer_signature }}" alt=""/>
+                        @else
+                        <div class="sig-image-spacer"></div>
+                        @endif
+                        <div class="sig-name">{{ $signer_name ?? 'Sche O. Ruivivar' }}</div>
+                        <div class="sig-title">{{ $signer_title ?? 'Office Administrator' }}</div>
                     </td>
                 </tr>
             </table>

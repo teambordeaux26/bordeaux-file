@@ -77,6 +77,56 @@
                             {{ form.errors.visitor_log_id }}
                         </p>
                     </div>
+
+                    <div>
+                        <label class="text-xs uppercase tracking-[0.3em] text-slate-500" for="signing_name">
+                            Signatory Name
+                        </label>
+                        <input
+                            id="signing_name"
+                            v-model="form.signing_name"
+                            type="text"
+                            class="soft-input mt-2 w-full"
+                            required
+                        />
+                        <p v-if="form.errors.signing_name" class="mt-1 text-xs text-red-600">
+                            {{ form.errors.signing_name }}
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="text-xs uppercase tracking-[0.3em] text-slate-500" for="signing_title">
+                            Signatory Title
+                        </label>
+                        <input
+                            id="signing_title"
+                            v-model="form.signing_title"
+                            type="text"
+                            class="soft-input mt-2 w-full"
+                            required
+                        />
+                        <p v-if="form.errors.signing_title" class="mt-1 text-xs text-red-600">
+                            {{ form.errors.signing_title }}
+                        </p>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">E-Signature</p>
+                        <p class="mt-1 mb-2 text-xs text-slate-500">
+                            Draw or upload your signature below. It is copied onto this certificate only.
+                            Changing it later will not rewrite certificates already issued.
+                            You can also save a default signature in
+                            <a href="/account" class="font-semibold text-[#003366] underline">My Account</a>.
+                        </p>
+                        <SignaturePad
+                            ref="pad"
+                            :existing-url="signer.signature_url"
+                            @update:model-value="form.signature = $event"
+                        />
+                        <p v-if="form.errors.signature" class="mt-1 text-xs text-red-600">
+                            {{ form.errors.signature }}
+                        </p>
+                    </div>
                     <div class="md:col-span-2 flex flex-wrap gap-3">
                         <button
                             type="submit"
@@ -122,6 +172,7 @@
                                     <th class="px-4 py-3">Visitor</th>
                                     <th class="px-4 py-3">Purpose</th>
                                     <th class="px-4 py-3">Issued</th>
+                                    <th class="px-4 py-3">Signed By</th>
                                     <th class="px-4 py-3 text-right">Action</th>
                                 </tr>
                             </thead>
@@ -140,6 +191,9 @@
                                     </td>
                                     <td class="px-4 py-3 text-slate-600">
                                         {{ cert.issued }}
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600">
+                                        {{ cert.signer }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
                                         <a
@@ -161,6 +215,16 @@
                     <Pagination :paginator="certificates" />
                 </div>
             </SectionCard>
+
+            <ReportPanel
+                title="Certificate Reports"
+                subtitle="Generate weekly or monthly certificate issuance summaries."
+                :period="reportPeriod"
+                :range="reportRange"
+                :report="report"
+                export-base="/certificates/reports/export"
+                @update:period="changeReportPeriod"
+            />
         </div>
     </AppLayout>
 </template>
@@ -172,17 +236,31 @@ import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
 import Pagination from "../../Components/Pagination.vue";
+import ReportPanel from "../../Components/ReportPanel.vue";
+import SignaturePad from "../../Components/SignaturePad.vue";
 
 const props = defineProps({
     certificates: { type: Object, default: () => ({ data: [], total: 0 }) },
     visitors: { type: Array, default: () => [] },
     selectedDate: { type: String, default: () => new Date().toISOString().slice(0, 10) },
+    report: { type: Object, default: () => ({ stats: [], breakdown: [], period: "monthly" }) },
+    reportRange: { type: String, default: "" },
+    signer: {
+        type: Object,
+        default: () => ({
+            signing_name: "",
+            signing_title: "",
+            has_signature: false,
+            signature_url: null,
+        }),
+    },
 });
 
 const certRows = computed(() => props.certificates?.data ?? []);
 
 const showForm = ref(false);
 const visitDate = ref(props.selectedDate);
+const pad = ref(null);
 
 watch(
     () => props.selectedDate,
@@ -203,22 +281,40 @@ const formattedDate = computed(() => {
 
 const form = useForm({
     visitor_log_id: "",
+    signing_name: props.signer.signing_name,
+    signing_title: props.signer.signing_title,
+    signature: "",
 });
+
+const reportPeriod = ref(props.report.period ?? "monthly");
 
 function loadVisitorsForDate() {
     form.visitor_log_id = "";
     router.get(
         "/certificates",
-        { date: visitDate.value },
+        { date: visitDate.value, report_period: reportPeriod.value },
         { preserveState: true, replace: true }
     );
 }
 
+function changeReportPeriod(period) {
+    reportPeriod.value = period;
+    router.get(
+        "/certificates",
+        { date: visitDate.value, report_period: period },
+        { preserveState: true, preserveScroll: true, replace: true }
+    );
+}
+
 function submit() {
+    if (pad.value?.isDirty?.()) {
+        form.signature = pad.value.toDataUrl();
+    }
+
     form.post("/certificates", {
         onSuccess: () => {
             showForm.value = false;
-            form.reset();
+            form.reset("visitor_log_id", "signature");
         },
     });
 }

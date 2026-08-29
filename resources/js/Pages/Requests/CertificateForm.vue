@@ -68,13 +68,14 @@
 
                     <div class="md:col-span-2">
                         <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
-                            Home Address <span class="text-red-500">*</span>
+                            Barangay (Oas, Albay) <span class="text-red-500">*</span>
                         </label>
-                        <input
-                            v-model="form.address"
-                            class="soft-input"
-                            :class="{ 'border-red-400': form.errors.address }"
-                            placeholder="Barangay, Municipality / City, Province"
+                        <SearchableSelect
+                            :model-value="form.address"
+                            :options="barangays"
+                            :input-class="{ 'border-red-400': form.errors.address }"
+                            placeholder="Search or select a barangay in Oas"
+                            @update:model-value="form.address = $event"
                         />
                         <p v-if="form.errors.address" class="mt-1 text-xs text-red-600">
                             {{ form.errors.address }}
@@ -141,18 +142,23 @@
 </template>
 
 <script setup>
-import { Head, Link, useForm } from "@inertiajs/vue3";
+import { computed } from "vue";
+import { Head, Link, useForm, usePage } from "@inertiajs/vue3";
 import GuestLayout from "../../Layouts/GuestLayout.vue";
+import SearchableSelect from "../../Components/SearchableSelect.vue";
 
 const props = defineProps({
     docRequest: { type: Object, required: true },
 });
 
+const page = usePage();
+const barangays = computed(() => page.props.oasBarangays ?? []);
+
 const form = useForm({
     visitor_name:  props.docRequest.name,
     visitor_phone: props.docRequest.phone,
     address:       props.docRequest.address,
-    purpose:       props.docRequest.type,
+    purpose:       props.docRequest.purpose || props.docRequest.type,
 });
 
 function submit() {

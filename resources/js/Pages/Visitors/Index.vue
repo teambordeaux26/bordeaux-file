@@ -6,11 +6,7 @@
                 title="Visitor's Log"
                 kicker="Front Desk"
                 subtitle="Digitally record visitor information and monitor daily activity."
-            >
-                <template #actions>
-                    <button class="soft-button-light">Daily Summary</button>
-                </template>
-            </PageHeader>
+            />
 
             <SectionCard
                 title="Record Visitor"
@@ -37,12 +33,14 @@
                         />
                     </div>
                     <div class="md:col-span-2">
-                        <label class="text-xs uppercase tracking-[0.3em] text-slate-500">Home Address</label>
-                        <input
-                            v-model="form.address"
-                            class="soft-input mt-2"
-                            :class="{ 'border-red-400': form.errors.address }"
-                            placeholder="Barangay, Municipality / City, Province"
+                        <label class="text-xs uppercase tracking-[0.3em] text-slate-500">Barangay (Oas, Albay)</label>
+                        <SearchableSelect
+                            class="mt-2"
+                            :model-value="form.address"
+                            :options="barangays"
+                            :input-class="{ 'border-red-400': form.errors.address }"
+                            placeholder="Search or select a barangay in Oas"
+                            @update:model-value="form.address = $event"
                         />
                         <p v-if="form.errors.address" class="mt-1 text-xs text-red-600">{{ form.errors.address }}</p>
                     </div>
@@ -95,19 +93,38 @@
                     </div>
                 </div>
             </SectionCard>
+
+            <ReportPanel
+                title="Visitor Reports"
+                subtitle="Generate weekly or monthly visitor summaries."
+                :period="reportPeriod"
+                :range="reportRange"
+                :report="report"
+                export-base="/visitors/reports/export"
+                @update:period="changeReportPeriod"
+            />
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { Head, useForm } from "@inertiajs/vue3";
+import { computed, ref } from "vue";
+import { Head, router, useForm, usePage } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
+import SearchableSelect from "../../Components/SearchableSelect.vue";
+import ReportPanel from "../../Components/ReportPanel.vue";
 
-defineProps({
+const props = defineProps({
     visitors: { type: Array, default: () => [] },
+    report: { type: Object, default: () => ({ stats: [], breakdown: [], period: "monthly" }) },
+    reportRange: { type: String, default: "" },
 });
+
+const page = usePage();
+const barangays = computed(() => page.props.oasBarangays ?? []);
+const reportPeriod = ref(props.report.period ?? "monthly");
 
 const form = useForm({
     visitor_name:  '',
@@ -121,5 +138,10 @@ function submit() {
         preserveScroll: true,
         onSuccess: () => form.reset(),
     });
+}
+
+function changeReportPeriod(period) {
+    reportPeriod.value = period;
+    router.get("/visitors", { report_period: period }, { preserveState: true, preserveScroll: true, replace: true });
 }
 </script>

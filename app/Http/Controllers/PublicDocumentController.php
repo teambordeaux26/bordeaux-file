@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\DocumentCategory;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -23,11 +24,11 @@ class PublicDocumentController extends Controller
         $settings = SystemSetting::current();
 
         if ($searched) {
-            $query = Document::with('category')
+            $query = Document::with(['category.parent'])
                 ->where('status', 'approved')
                 ->whereNotNull('file_path');
 
-            $allowedCategories = $settings->public_search_categories ?? [];
+            $allowedCategories = DocumentCategory::expandIds($settings->public_search_categories ?? []);
             if (! empty($allowedCategories)) {
                 $query->whereIn('category_id', $allowedCategories);
             }
@@ -40,7 +41,7 @@ class PublicDocumentController extends Controller
                 'id'           => $document->id,
                 'tracking'     => $document->tracking_number,
                 'title'        => $document->title,
-                'category'     => $document->category?->name ?? '—',
+                'category'     => $document->category?->label() ?? '—',
                 'summary'      => $document->description
                     ? Str::limit($document->description, 80)
                     : '—',
@@ -61,7 +62,7 @@ class PublicDocumentController extends Controller
     public function show(Document $document)
     {
         $this->ensurePublicDocument($document);
-        $document->load('category');
+        $document->load(['category.parent']);
 
         $previewable = $this->isPreviewable($document->file_path);
 
@@ -71,7 +72,7 @@ class PublicDocumentController extends Controller
                 'reference'   => $document->reference_no,
                 'title'       => $document->title,
                 'description' => $document->description ?? '—',
-                'category'    => $document->category?->name ?? '—',
+                'category'    => $document->category?->label() ?? '—',
                 'released'    => $document->approved_at?->format('M d, Y')
                     ?? $document->updated_at->format('M d, Y'),
                 'previewable' => $previewable,
@@ -114,7 +115,8 @@ class PublicDocumentController extends Controller
                 $method = $first ? 'whereHas' : 'orWhereHas';
                 $builder->{$method}('category', fn ($categoryQuery) => $categoryQuery
                     ->where('name', 'like', "%{$q}%")
-                    ->orWhere('description', 'like', "%{$q}%"));
+                    ->orWhere('description', 'like', "%{$q}%")
+                    ->orWhereHas('parent', fn ($parentQuery) => $parentQuery->where('name', 'like', "%{$q}%")));
                 $first = false;
                 continue;
             }
@@ -136,7 +138,7 @@ class PublicDocumentController extends Controller
         }
 
         $settings = SystemSetting::current();
-        $allowedCategories = $settings->public_search_categories ?? [];
+        $allowedCategories = DocumentCategory::expandIds($settings->public_search_categories ?? []);
 
         if (! empty($allowedCategories) && ! in_array($document->category_id, $allowedCategories, true)) {
             abort(404);

@@ -1,7 +1,6 @@
 import {
     Archive,
     Award,
-    BarChart3,
     Building2,
     ClipboardCheck,
     FileText,
@@ -27,7 +26,6 @@ export const navIconMap = {
     Building2,
     ClipboardCheck,
     Inbox,
-    BarChart3,
     ScrollText,
     Settings,
 };
@@ -44,7 +42,6 @@ export const navIconByHref = {
     "/departments": "Building2",
     "/approvals": "ClipboardCheck",
     "/requests": "Inbox",
-    "/reports": "BarChart3",
     "/audit": "ScrollText",
     "/settings": "Settings",
 };

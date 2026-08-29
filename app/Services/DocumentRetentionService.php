@@ -34,7 +34,8 @@ class DocumentRetentionService
 
     public static function formatRetention(int $days): string
     {
-        return match ($days) {
+            return match ($days) {
+            7       => '7 Days',
             30      => '30 Days',
             90      => '90 Days',
             180     => '6 Months',

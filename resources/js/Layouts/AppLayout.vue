@@ -104,7 +104,7 @@ const baseSections = computed(() => [
             { label: "Documents", href: "/documents", icon: "FileText" },
             { label: "Workflow", href: "/workflow", icon: "GitBranch" },
             {
-                label: "Returned to Me",
+                label: "Returned Documents",
                 href: "/documents/returned",
                 icon: "RotateCcw",
                 badge: returnedCount.value > 0 ? returnedCount.value : null,
@@ -123,7 +123,6 @@ const adminSection = {
         { label: "Departments", href: "/departments", icon: "Building2" },
         { label: "Review & Approval", href: "/approvals", icon: "ClipboardCheck" },
         { label: "Request Reviews", href: "/requests", icon: "Inbox" },
-        { label: "Reports", href: "/reports", icon: "BarChart3" },
         { label: "Audit Trail", href: "/audit", icon: "ScrollText" },
         { label: "Settings", href: "/settings", icon: "Settings" },
     ],

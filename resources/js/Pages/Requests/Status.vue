@@ -63,6 +63,10 @@
                         <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Request Type</p>
                         <p class="text-gray-900 font-medium">{{ result.request_type }}</p>
                     </div>
+                    <div v-if="result.purpose">
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Purpose</p>
+                        <p class="text-gray-900">{{ result.purpose }}</p>
+                    </div>
                     <div>
                         <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Date Submitted</p>
                         <p class="text-gray-900">{{ result.submitted_at }}</p>
@@ -89,7 +93,7 @@
                         <p v-else-if="result.has_file" class="text-xs text-gray-600 mt-0.5">
                             Your requested document is ready. Download it below or check the copy sent to your email.
                         </p>
-                        <p v-else-if="result.request_type === 'Certificate of Appearance'" class="text-xs text-gray-600 mt-0.5">
+                        <p v-else-if="result.issues_certificate" class="text-xs text-gray-600 mt-0.5">
                             You may register your visit and generate your
                             <strong>Certificate of Appearance</strong>.
                         </p>
@@ -111,7 +115,7 @@
                             View Certificate
                         </Link>
                         <Link
-                            v-else-if="result.request_type === 'Certificate of Appearance'"
+                            v-else-if="result.issues_certificate"
                             :href="`/requests/${result.id}/certificate`"
                             class="inline-flex items-center gap-2 px-5 py-2.5 border border-[#003366] text-[#003366] text-sm font-bold hover:bg-[#003366] hover:text-white transition shrink-0"
                         >
@@ -182,7 +186,7 @@ const STATUS_MAP = {
     under_review: { label: 'Under Review', cls: 'bg-blue-100 text-blue-800' },
     approved:     { label: 'Approved',     cls: 'bg-green-100 text-green-800' },
     completed:    { label: 'Completed',    cls: 'bg-emerald-100 text-emerald-800' },
-    rejected:     { label: 'Rejected',     cls: 'bg-red-100 text-red-800' },
+    rejected:     { label: 'Disapproved',  cls: 'bg-red-100 text-red-800' },
 };
 
 function statusLabel(status) {

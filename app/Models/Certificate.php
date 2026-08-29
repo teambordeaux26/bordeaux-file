@@ -16,6 +16,9 @@ class Certificate extends Model
         'certificate_no',
         'verification_token',
         'issued_by',
+        'signer_name',
+        'signer_title',
+        'signer_signature_path',
         'issued_at',
         'file_path',
     ];

@@ -58,7 +58,7 @@ class WorkflowController extends Controller
                 'color'   => 'orange',
             ],
             'rejected' => [
-                'label'   => 'Rejected',
+                'label'   => 'Disapproved',
                 'kicker'  => 'Closed',
                 'color'   => 'rose',
             ],
@@ -70,7 +70,7 @@ class WorkflowController extends Controller
         $user   = Auth::user();
         $stages = static::stages();
 
-        $documents = Document::with(['category', 'submitter', 'reviewer'])
+        $documents = Document::with(['category.parent', 'submitter', 'reviewer'])
             ->whereIn('status', array_keys($stages))
             ->orderBy('updated_at', 'desc')
             ->get();
@@ -99,7 +99,7 @@ class WorkflowController extends Controller
             if ($d->category && ! isset($categories[$d->category->id])) {
                 $categories[$d->category->id] = [
                     'id'   => $d->category->id,
-                    'name' => $d->category->name,
+                    'name' => $d->category->label(),
                 ];
             }
 
@@ -108,8 +108,9 @@ class WorkflowController extends Controller
                 'tracking'     => $d->tracking_number,
                 'reference'    => $d->reference_no,
                 'title'        => $d->title,
-                'category'     => $d->category?->name ?? '—',
+                'category'     => $d->category?->label() ?? '—',
                 'category_id'  => $d->category_id,
+                'category_parent_id' => $d->category?->parent_id,
                 'owner'        => $d->submitter?->name ?? '—',
                 'owner_id'     => $d->submitted_by,
                 'reviewer'     => $d->reviewer?->name,
@@ -195,7 +196,7 @@ class WorkflowController extends Controller
                 if ($isAdmin) {
                     $actions[] = ['key' => 'approve', 'label' => 'Approve', 'variant' => 'primary'];
                     $actions[] = ['key' => 'return', 'label' => 'Return', 'variant' => 'warn', 'needs_remarks' => true];
-                    $actions[] = ['key' => 'reject', 'label' => 'Reject', 'variant' => 'danger', 'needs_remarks' => true];
+                    $actions[] = ['key' => 'reject', 'label' => 'Disapprove', 'variant' => 'danger', 'needs_remarks' => true];
                 }
                 break;
 
@@ -267,7 +268,7 @@ class WorkflowController extends Controller
             'reject' => [
                 'rejected',
                 [],
-                "rejected",
+                "disapproved",
             ],
             default => [null, [], null],
         };
@@ -309,7 +310,7 @@ class WorkflowController extends Controller
             ],
             [
                 'role'  => 'Admin',
-                'does'  => 'Approves and releases documents, or returns/rejects them.',
+                'does'  => 'Approves and releases documents, or returns/disapproves them.',
             ],
         ];
     }

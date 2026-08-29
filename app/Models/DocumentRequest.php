@@ -17,6 +17,8 @@ class DocumentRequest extends Model
         'requester_phone',
         'requester_address',
         'request_type',
+        'request_type_id',
+        'purpose',
         'details',
         'status',
         'response_file_path',
@@ -37,8 +39,33 @@ class DocumentRequest extends Model
         return $this->belongsTo(User::class, 'processed_by');
     }
 
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(RequestType::class, 'request_type_id');
+    }
+
     public function certificate(): BelongsTo
     {
         return $this->belongsTo(Certificate::class);
+    }
+
+    public function issuesCertificate(): bool
+    {
+        $this->loadMissing('type');
+
+        if ($this->type) {
+            return $this->type->issues_certificate;
+        }
+
+        return strcasecmp((string) $this->request_type, 'Certificate of Appearance') === 0;
+    }
+
+    public function connectedPurpose(): string
+    {
+        $this->loadMissing('type');
+
+        $purpose = trim((string) ($this->purpose ?: $this->type?->purpose ?: $this->details ?: $this->request_type));
+
+        return $purpose !== '' ? $purpose : 'Office request';
     }
 }

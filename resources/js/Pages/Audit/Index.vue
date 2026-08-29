@@ -25,6 +25,7 @@
                         <option>Document Approved</option>
                         <option>Document Returned</option>
                         <option>Document Rejected</option>
+                        <option>Document Disapproved</option>
                         <option>Document Restored</option>
                         <option>Visitor Logged</option>
                         <option>Certificate Generated</option>

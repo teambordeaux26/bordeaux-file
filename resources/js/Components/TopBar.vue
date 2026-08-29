@@ -124,6 +124,12 @@
                     </p>
                 </div>
                 <Link
+                    href="/account"
+                    class="border border-gray-400 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:border-[#003366] hover:text-[#003366] transition"
+                >
+                    Account
+                </Link>
+                <Link
                     href="/logout"
                     method="post"
                     as="button"

@@ -12,7 +12,7 @@ class ApprovalsController extends Controller
 {
     public function index()
     {
-        $documents = Document::with(['category', 'submitter'])
+        $documents = Document::with(['category.parent', 'submitter'])
             ->whereIn('status', ['pending', 'under_review'])
             ->latest()
             ->get()
@@ -20,7 +20,7 @@ class ApprovalsController extends Controller
                 'id'       => $d->id,
                 'tracking' => $d->tracking_number,
                 'title'    => $d->title,
-                'category' => $d->category?->name ?? '—',
+                'category' => $d->category?->label() ?? '—',
                 'owner'    => $d->submitter?->name ?? '—',
                 'priority' => $d->priority,
                 'age'      => $d->created_at->diffForHumans(),
@@ -76,12 +76,12 @@ class ApprovalsController extends Controller
 
         AuditLog::create([
             'user_id'     => Auth::id(),
-            'action'      => 'Document Rejected',
-            'description' => "Document {$document->tracking_number} rejected.",
+            'action'      => 'Document Disapproved',
+            'description' => "Document {$document->tracking_number} disapproved.",
             'ip_address'  => request()->ip(),
         ]);
 
         return redirect()->route('approvals.index')
-            ->with('error', "Document {$document->tracking_number} has been rejected.");
+            ->with('error', "Document {$document->tracking_number} has been disapproved.");
     }
 }

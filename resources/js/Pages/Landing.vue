@@ -210,8 +210,13 @@
                 </div>
 
                 <!-- Logo -->
-                <div class="fade-in flex justify-center lg:justify-end" style="--delay: 380ms">
-                    <div class="h-44 w-44 sm:h-56 sm:w-56 rounded-full overflow-hidden border-4 border-[#FFD700] shadow-lg bg-white">
+                <div
+                    class="fade-in flex justify-center lg:justify-end"
+                    style="--delay: 380ms"
+                >
+                    <div
+                        class="h-44 w-44 sm:h-56 sm:w-56 rounded-full overflow-hidden border-4 border-[#FFD700] shadow-lg bg-white"
+                    >
                         <img
                             :src="'/images/logo.png'"
                             alt="Office of the Vice Mayor — Oas, Albay"
@@ -236,8 +241,13 @@
                     :key="n"
                     aria-hidden="n > 1 ? true : undefined"
                 >
-                    Office Hours: {{ site.office_hours || 'Monday to Friday, 8:00 AM – 5:00 PM' }}
-                    &nbsp;&nbsp;&bull;&nbsp;&nbsp; Hotline: {{ site.hotline || '(052) 555-0198' }}
+                    Office Hours:
+                    {{
+                        site.office_hours ||
+                        "Monday to Friday, 8:00 AM – 5:00 PM"
+                    }}
+                    &nbsp;&nbsp;&bull;&nbsp;&nbsp; Hotline:
+                    {{ site.hotline || "(052) 555-0198" }}
                     &nbsp;&nbsp;&bull;&nbsp;&nbsp; Office of the Vice Mayor,
                     Oas, Albay &nbsp;&nbsp;&bull;&nbsp;&nbsp; Republic of the
                     Philippines &nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -463,7 +473,7 @@
                     </div>
                 </div>
                 <div class="text-xs text-blue-200 space-y-1 sm:text-right">
-                    <p>Hotline: {{ site.hotline || '(052) 555-0198' }}</p>
+                    <p>Hotline: {{ site.hotline || "(052) 555-0198" }}</p>
                     <p>Email: info@oas-albay.gov.ph</p>
                     <p class="text-[10px] text-blue-300 mt-1">
                         All Rights Reserved &copy;

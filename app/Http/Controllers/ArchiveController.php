@@ -14,7 +14,7 @@ class ArchiveController extends Controller
     {
         $retentionService->archiveExpired();
 
-        $archives = Document::with(['category', 'submitter'])
+        $archives = Document::with(['category.parent', 'submitter'])
             ->where('status', 'archived')
             ->latest('archived_at')
             ->paginate(10)
@@ -23,7 +23,7 @@ class ArchiveController extends Controller
                 'id'       => $d->id,
                 'tracking' => $d->tracking_number,
                 'title'    => $d->title,
-                'category' => $d->category?->name ?? '—',
+                'category' => $d->category?->label() ?? '—',
                 'owner'    => $d->submitter?->name ?? '—',
                 'retention' => $d->retention_days
                     ? DocumentRetentionService::formatRetention($d->retention_days)

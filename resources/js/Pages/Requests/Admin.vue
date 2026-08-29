@@ -64,6 +64,7 @@
                             <p class="text-sm font-semibold text-slate-900">{{ req.name }}</p>
                             <p class="text-xs text-slate-500 mt-0.5">
                                 {{ req.type }}
+                                <template v-if="req.purpose"> — {{ req.purpose }}</template>
                                 &bull; Submitted {{ req.submitted_at }}
                                 <template v-if="req.processed_by">
                                     &bull; Processed by {{ req.processed_by }}
@@ -100,7 +101,7 @@
                                     :disabled="processing === req.id + '-rejected'"
                                     @click="updateStatus(req, 'rejected')"
                                 >
-                                    {{ processing === req.id + '-rejected' ? '…' : 'Reject' }}
+                                    {{ processing === req.id + '-rejected' ? '…' : 'Disapprove' }}
                                 </button>
                             </template>
 
@@ -117,7 +118,7 @@
                                     :disabled="processing === req.id + '-rejected'"
                                     @click="updateStatus(req, 'rejected')"
                                 >
-                                    {{ processing === req.id + '-rejected' ? '…' : 'Reject' }}
+                                    {{ processing === req.id + '-rejected' ? '…' : 'Disapprove' }}
                                 </button>
                             </template>
 
@@ -155,7 +156,7 @@
                     class="fixed inset-0 z-[100] flex items-center justify-center px-4"
                     @click.self="closeCompleteModal"
                 >
-                    <div class="w-full max-w-md bg-white border border-gray-300 border-t-4 border-t-[#003366] shadow-xl">
+                    <div class="w-full max-w-lg bg-white border border-gray-300 border-t-4 border-t-[#003366] shadow-xl max-h-[90vh] overflow-y-auto">
                         <div class="border-b border-gray-200 px-5 py-4">
                             <p class="text-xs uppercase tracking-widest text-gray-500 font-semibold">Complete Request</p>
                             <h3 class="text-lg font-bold text-[#003366]">{{ completeTarget.tracking }}</h3>
@@ -174,6 +175,43 @@
                                     <span class="font-semibold">{{ completeTarget.email }}</span>
                                     and made available for download on the status page.
                                 </template>
+                            </div>
+
+                            <div v-if="isCertificateRequest" class="space-y-3">
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                                            Signatory Name
+                                        </label>
+                                        <input v-model="completeForm.signing_name" type="text" class="soft-input" required />
+                                        <p v-if="completeForm.errors.signing_name" class="mt-1 text-xs text-red-600">
+                                            {{ completeForm.errors.signing_name }}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                                            Title
+                                        </label>
+                                        <input v-model="completeForm.signing_title" type="text" class="soft-input" required />
+                                        <p v-if="completeForm.errors.signing_title" class="mt-1 text-xs text-red-600">
+                                            {{ completeForm.errors.signing_title }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">E-Signature</p>
+                                    <SignaturePad
+                                        ref="pad"
+                                        :existing-url="signer.signature_url"
+                                        @update:model-value="completeForm.signature = $event"
+                                    />
+                                    <p class="mt-1 text-[11px] text-gray-500">
+                                        Draw or upload your signature. It is copied onto this certificate. Changing it later will not rewrite certificates already issued.
+                                    </p>
+                                    <p v-if="completeForm.errors.signature" class="mt-1 text-xs text-red-600">
+                                        {{ completeForm.errors.signature }}
+                                    </p>
+                                </div>
                             </div>
 
                             <div v-if="!isCertificateRequest">
@@ -227,9 +265,19 @@ import { ref, computed } from "vue";
 import { Head, router, useForm } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
+import SignaturePad from "../../Components/SignaturePad.vue";
 
 const props = defineProps({
     requests: { type: Array, default: () => [] },
+    signer: {
+        type: Object,
+        default: () => ({
+            signing_name: "",
+            signing_title: "",
+            has_signature: false,
+            signature_url: null,
+        }),
+    },
 });
 
 const tabs = [
@@ -237,16 +285,20 @@ const tabs = [
     { label: 'Pending',      value: 'pending' },
     { label: 'Under Review', value: 'under_review' },
     { label: 'Completed',    value: 'completed' },
-    { label: 'Rejected',     value: 'rejected' },
+    { label: 'Disapproved',  value: 'rejected' },
 ];
 
 const activeTab  = ref('all');
 const expandedId = ref(null);
 const processing = ref(null);
 const completeTarget = ref(null);
+const pad = ref(null);
 
 const completeForm = useForm({
     response_file: null,
+    signing_name: props.signer.signing_name,
+    signing_title: props.signer.signing_title,
+    signature: "",
 });
 
 const filtered = computed(() =>
@@ -256,7 +308,7 @@ const filtered = computed(() =>
 );
 
 const isCertificateRequest = computed(
-    () => completeTarget.value?.type === 'Certificate of Appearance'
+    () => Boolean(completeTarget.value?.issues_certificate)
 );
 
 function toggleExpand(id) {
@@ -271,6 +323,9 @@ function openCompleteModal(req) {
 
     completeTarget.value = req;
     completeForm.reset();
+    completeForm.signing_name = props.signer.signing_name;
+    completeForm.signing_title = props.signer.signing_title;
+    completeForm.signature = "";
     completeForm.clearErrors();
 }
 
@@ -293,6 +348,10 @@ function submitComplete() {
         return;
     }
 
+    if (isCertificateRequest.value && pad.value?.isDirty?.()) {
+        completeForm.signature = pad.value.toDataUrl();
+    }
+
     completeForm.post(`/requests/${completeTarget.value.id}/complete`, {
         forceFormData: !isCertificateRequest.value,
         preserveScroll: true,
@@ -302,7 +361,7 @@ function submitComplete() {
 
 function updateStatus(req, status) {
     if (status === 'rejected') {
-        if (!confirm(`Reject request ${req.tracking} from ${req.name}? This cannot be undone easily.`)) return;
+        if (!confirm(`Disapprove request ${req.tracking} from ${req.name}? This cannot be undone easily.`)) return;
     }
     processing.value = req.id + '-' + status;
     router.put(`/requests/${req.id}/status`, { status }, {
@@ -315,7 +374,7 @@ const STATUS_MAP = {
     pending:      { label: 'Pending',      cls: 'bg-amber-100 text-amber-800' },
     under_review: { label: 'Under Review', cls: 'bg-blue-100 text-blue-800' },
     completed:    { label: 'Completed',    cls: 'bg-emerald-100 text-emerald-800' },
-    rejected:     { label: 'Rejected',     cls: 'bg-red-100 text-red-800' },
+    rejected:     { label: 'Disapproved',  cls: 'bg-red-100 text-red-800' },
 };
 
 function statusLabel(s) { return STATUS_MAP[s]?.label ?? s; }

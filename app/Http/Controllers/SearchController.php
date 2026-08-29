@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\DocumentRequest;
 use App\Models\User;
 use App\Models\VisitorLog;
+use App\Support\DocumentStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -65,7 +66,7 @@ class SearchController extends Controller
     {
         $statusQuery = str_replace(' ', '_', strtolower($q));
 
-        return Document::with(['category', 'submitter', 'reviewer'])
+        return Document::with(['category.parent', 'submitter', 'reviewer'])
             ->where(function (Builder $builder) use ($q, $statusQuery) {
                 $builder->where('title', 'like', "%{$q}%")
                     ->orWhere('tracking_number', 'like', "%{$q}%")
@@ -76,7 +77,10 @@ class SearchController extends Controller
                     ->orWhereRaw("REPLACE(status, '_', ' ') LIKE ?", ["%{$q}%"])
                     ->orWhereHas('category', function (Builder $categoryQuery) use ($q) {
                         $categoryQuery->where('name', 'like', "%{$q}%")
-                            ->orWhere('description', 'like', "%{$q}%");
+                            ->orWhere('description', 'like', "%{$q}%")
+                            ->orWhereHas('parent', function (Builder $parentQuery) use ($q) {
+                                $parentQuery->where('name', 'like', "%{$q}%");
+                            });
                     })
                     ->orWhereHas('submitter', function (Builder $userQuery) use ($q) {
                         $userQuery->where('name', 'like', "%{$q}%")
@@ -98,12 +102,12 @@ class SearchController extends Controller
                 'title'     => $document->title,
                 'subtitle'  => implode(' · ', array_filter([
                     $document->tracking_number,
-                    $document->category?->name,
+                    $document->category?->label(),
                     $document->priority,
                     $document->submitter?->name,
                     $document->created_at->format('M d, Y'),
                 ])),
-                'status'    => ucfirst(str_replace('_', ' ', $document->status)),
+                'status'    => DocumentStatus::label($document->status),
                 'url'       => route('documents.show', $document->id),
                 'external'  => false,
                 'sort_date' => $document->created_at->timestamp,
@@ -115,6 +119,8 @@ class SearchController extends Controller
         return Certificate::with(['visitorLog', 'issuer'])
             ->where(function (Builder $builder) use ($q) {
                 $builder->where('certificate_no', 'like', "%{$q}%")
+                    ->orWhere('signer_name', 'like', "%{$q}%")
+                    ->orWhere('signer_title', 'like', "%{$q}%")
                     ->orWhereHas('visitorLog', function (Builder $visitorQuery) use ($q) {
                         $visitorQuery->where('visitor_name', 'like', "%{$q}%")
                             ->orWhere('visitor_email', 'like', "%{$q}%")
@@ -139,7 +145,7 @@ class SearchController extends Controller
                 'subtitle'  => implode(' · ', array_filter([
                     $certificate->visitorLog?->visitor_name,
                     $certificate->visitorLog?->purpose ?? 'Certificate of Appearance',
-                    $certificate->issuer?->name,
+                    $certificate->signer_name ?: $certificate->issuer?->name,
                     ($certificate->issued_at ?? $certificate->created_at)?->format('M d, Y'),
                 ])),
                 'status'    => 'Issued',

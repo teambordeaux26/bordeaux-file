@@ -5,7 +5,7 @@
             <PageHeader
                 title="Document Management"
                 kicker="Documents"
-                subtitle="Centralize, categorize, and monitor all incoming and outgoing records."
+                subtitle="Store, categorize, and monitor records by official document type."
             >
                 <template #actions>
                     <Link href="/documents/upload" class="soft-button"
@@ -13,6 +13,45 @@
                     >
                 </template>
             </PageHeader>
+
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <button
+                    type="button"
+                    class="border px-4 py-3 text-left transition"
+                    :class="!filterCategory ? 'border-[#003366] bg-blue-50' : 'border-gray-300 bg-white hover:border-[#003366]'"
+                    @click="selectCategory('')"
+                >
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">All categories</p>
+                    <p class="mt-1 text-lg font-bold text-[#003366]">{{ totalCategoryCount }}</p>
+                </button>
+                <button
+                    v-for="cat in categoryTree"
+                    :key="cat.id"
+                    type="button"
+                    class="border px-4 py-3 text-left transition"
+                    :class="Number(filterCategory) === Number(cat.id) ? 'border-[#003366] bg-blue-50' : 'border-gray-300 bg-white hover:border-[#003366]'"
+                    @click="selectCategory(cat.id)"
+                >
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">{{ cat.name }}</p>
+                    <p class="mt-1 text-lg font-bold text-[#003366]">{{ cat.count }}</p>
+                </button>
+            </div>
+
+            <div
+                v-if="selectedParent?.children?.length"
+                class="flex flex-wrap gap-2"
+            >
+                <button
+                    v-for="child in selectedParent.children"
+                    :key="child.id"
+                    type="button"
+                    class="px-3 py-1.5 text-xs font-semibold border"
+                    :class="Number(filterCategory) === Number(child.id) ? 'bg-[#003366] text-white border-[#003366]' : 'bg-white text-[#003366] border-[#003366]'"
+                    @click="selectCategory(child.id)"
+                >
+                    {{ child.name }} ({{ child.count }})
+                </button>
+            </div>
 
             <SectionCard
                 title="Document Queue"
@@ -29,17 +68,20 @@
                     />
                     <select
                         v-model="filterCategory"
-                        class="soft-select !w-48 shrink-0"
+                        class="soft-select !w-64 shrink-0"
                         @change="applyFilters"
                     >
                         <option value="">All categories</option>
-                        <option
-                            v-for="cat in categories"
-                            :key="cat.id"
-                            :value="cat.name"
-                        >
-                            {{ cat.name }}
-                        </option>
+                        <template v-for="cat in categoryTree" :key="cat.id">
+                            <option :value="cat.id">{{ cat.name }}</option>
+                            <option
+                                v-for="child in cat.children"
+                                :key="child.id"
+                                :value="child.id"
+                            >
+                                — {{ child.name }}
+                            </option>
+                        </template>
                     </select>
                     <select
                         v-model="filterStatus"
@@ -51,6 +93,7 @@
                         <option>Under Review</option>
                         <option>Approved</option>
                         <option>Returned</option>
+                        <option>Disapproved</option>
                     </select>
                     <button
                         type="button"
@@ -178,6 +221,16 @@
 
                 <Pagination :paginator="documents" />
             </SectionCard>
+
+            <ReportPanel
+                title="Document Movement Overview"
+                subtitle="Generate and export processed documents by week or month."
+                :period="reportPeriod"
+                :range="reportRange"
+                :report="report"
+                export-base="/documents/reports/export"
+                @update:period="changeReportPeriod"
+            />
         </div>
     </AppLayout>
 </template>
@@ -189,42 +242,67 @@ import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
 import Pagination from "../../Components/Pagination.vue";
+import ReportPanel from "../../Components/ReportPanel.vue";
 
 const props = defineProps({
     documents: { type: Object, default: () => ({ data: [] }) },
-    categories: { type: Array, default: () => [] },
+    categoryTree: { type: Array, default: () => [] },
+    report: { type: Object, default: () => ({ stats: [], breakdown: [], period: "monthly" }) },
+    reportRange: { type: String, default: "" },
     filters: {
         type: Object,
-        default: () => ({ q: "", category: "", status: "" }),
+        default: () => ({ q: "", category_id: "", status: "" }),
     },
 });
 
 const rows = computed(() => props.documents?.data ?? []);
+const totalCategoryCount = computed(() =>
+    props.categoryTree.reduce((sum, cat) => sum + (cat.count || 0), 0)
+);
+const selectedParent = computed(() => {
+    const id = Number(filterCategory.value);
+    return props.categoryTree.find((cat) => Number(cat.id) === id)
+        || props.categoryTree.find((cat) => (cat.children || []).some((child) => Number(child.id) === id))
+        || null;
+});
 
 const search = ref(props.filters.q ?? "");
-const filterCategory = ref(props.filters.category ?? "");
+const filterCategory = ref(props.filters.category_id ?? "");
 const filterStatus = ref(props.filters.status ?? "");
+const reportPeriod = ref(props.report.period ?? "monthly");
 
 watch(
     () => props.filters,
     (value) => {
         search.value = value?.q ?? "";
-        filterCategory.value = value?.category ?? "";
+        filterCategory.value = value?.category_id ?? "";
         filterStatus.value = value?.status ?? "";
     },
     { deep: true }
 );
 
+function currentParams(extra = {}) {
+    return {
+        q: search.value || undefined,
+        category_id: filterCategory.value || undefined,
+        status: filterStatus.value || undefined,
+        report_period: reportPeriod.value || undefined,
+        ...extra,
+    };
+}
+
 function applyFilters() {
-    router.get(
-        "/documents",
-        {
-            q: search.value || undefined,
-            category: filterCategory.value || undefined,
-            status: filterStatus.value || undefined,
-        },
-        { preserveState: true, preserveScroll: true, replace: true }
-    );
+    router.get("/documents", currentParams(), { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function selectCategory(id) {
+    filterCategory.value = id;
+    applyFilters();
+}
+
+function changeReportPeriod(period) {
+    reportPeriod.value = period;
+    applyFilters();
 }
 
 const statusClass = (status) => {
@@ -232,6 +310,7 @@ const statusClass = (status) => {
         Approved: "bg-green-100 text-green-800",
         "Under Review": "bg-yellow-100 text-yellow-800",
         Returned: "bg-red-100 text-red-700",
+        Disapproved: "bg-rose-100 text-rose-800",
         Archived: "bg-gray-100 text-gray-600",
         Pending: "bg-blue-50 text-[#003366]",
     };

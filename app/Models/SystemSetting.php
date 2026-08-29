@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SystemSetting extends Model
 {
@@ -12,6 +13,7 @@ class SystemSetting extends Model
         'public_search_fields',
         'public_search_categories',
         'employee_pages',
+        'official_signer_user_id',
     ];
 
     protected $casts = [
@@ -33,6 +35,7 @@ class SystemSetting extends Model
             'public_search_fields'     => static::defaultPublicSearchFields(),
             'public_search_categories' => [],
             'employee_pages'           => static::defaultEmployeePages(),
+            'official_signer_user_id'  => null,
         ];
     }
 
@@ -82,16 +85,26 @@ class SystemSetting extends Model
             'documents.returned'    => 'documents',
             'documents.edit'        => 'documents',
             'documents.update'      => 'documents',
+            'documents.reports'     => 'documents',
             'workflow.index'        => 'workflow',
             'workflow.advance'      => 'workflow',
             'visitors.index'        => 'visitors',
             'visitors.store'        => 'visitors',
+            'visitors.reports'      => 'visitors',
             'certificates.index'    => 'certificates',
             'certificates.generate' => 'certificates',
             'certificates.download' => 'certificates',
+            'certificates.reports'  => 'certificates',
             'search.suggest'        => 'search',
             'archive.index'         => 'archive',
+            'events.store'          => 'dashboard',
+            'events.destroy'        => 'dashboard',
         ];
+    }
+
+    public function officialSigner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'official_signer_user_id');
     }
 
     public function allowsEmployeePage(string $pageKey): bool

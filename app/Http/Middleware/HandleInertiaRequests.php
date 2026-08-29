@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Document;
 use App\Models\SystemSetting;
+use App\Support\OasBarangays;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -80,6 +81,7 @@ class HandleInertiaRequests extends Middleware
             'employeePages' => fn () => $request->user()?->role === 'employee'
                 ? ($settings->employee_pages ?? SystemSetting::defaultEmployeePages())
                 : null,
+            'oasBarangays' => fn () => OasBarangays::options(),
             'returnedCount' => fn () => $this->returnedCountFor($request),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

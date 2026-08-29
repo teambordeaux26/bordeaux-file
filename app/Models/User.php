@@ -35,6 +35,9 @@ class User extends Authenticatable
         'phone',
         'status',
         'last_login_at',
+        'signing_name',
+        'signing_title',
+        'signature_path',
     ];
 
     /**

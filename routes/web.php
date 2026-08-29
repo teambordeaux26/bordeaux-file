@@ -2,16 +2,19 @@
 
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\ArchiveController;
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\ApprovalsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\EventController;
 use App\Http\Controllers\PublicDocumentController;
 use App\Http\Controllers\RequestController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\RequestTypeController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VisitorController;
 use App\Http\Controllers\WorkflowController;
@@ -29,13 +32,23 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
+Route::middleware(['auth', 'role:admin,employee'])->group(function () {
+    Route::get('/account', [AccountController::class, 'show'])->name('account.show');
+    Route::put('/account/password', [AccountController::class, 'updatePassword'])->name('account.password');
+    Route::put('/account/signature', [AccountController::class, 'updateSignature'])->name('account.signature');
+    Route::delete('/account/signature', [AccountController::class, 'destroySignature'])->name('account.signature.destroy');
+});
+
 Route::middleware(['auth', 'role:admin,employee', 'employee.page'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/events', [EventController::class, 'store'])->name('events.store');
+    Route::delete('/events/{event}', [EventController::class, 'destroy'])->name('events.destroy');
 
     // Documents
     Route::get('/documents',                      [DocumentController::class, 'index'])->name('documents.index');
     Route::get('/documents/upload',               [DocumentController::class, 'uploadForm'])->name('documents.upload');
     Route::get('/documents/returned',             [DocumentController::class, 'returnedIndex'])->name('documents.returned');
+    Route::get('/documents/reports/export',       [DocumentController::class, 'exportReport'])->name('documents.reports');
     Route::post('/documents',                     [DocumentController::class, 'store'])->name('documents.store');
     Route::get('/documents/{document}/edit',      [DocumentController::class, 'edit'])->name('documents.edit');
     Route::put('/documents/{document}',           [DocumentController::class, 'update'])->name('documents.update');
@@ -45,10 +58,12 @@ Route::middleware(['auth', 'role:admin,employee', 'employee.page'])->group(funct
     // Visitors
     Route::get('/visitors',  [VisitorController::class, 'index'])->name('visitors.index');
     Route::post('/visitors', [VisitorController::class, 'store'])->name('visitors.store');
+    Route::get('/visitors/reports/export', [VisitorController::class, 'exportReport'])->name('visitors.reports');
 
     // Certificates
     Route::get('/certificates',                        [CertificateController::class, 'index'])->name('certificates.index');
     Route::post('/certificates',                       [CertificateController::class, 'generate'])->name('certificates.generate');
+    Route::get('/certificates/reports/export',         [CertificateController::class, 'exportReport'])->name('certificates.reports');
     Route::get('/certificates/{certificate}/download', [CertificateController::class, 'download'])->name('certificates.download');
 
     // Global search (top-bar suggest only)
@@ -88,17 +103,16 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     // Archive
     Route::put('/archive/{document}/restore', [ArchiveController::class, 'restore'])->name('archive.restore');
 
-    // Reports
-    Route::get('/reports', function () {
-        return Inertia::render('Reports/Index');
-    })->name('reports.index');
-
     // Audit
     Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
 
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/request-types', [RequestTypeController::class, 'store'])->name('settings.request-types.store');
+    Route::put('/settings/request-types/reorder', [RequestTypeController::class, 'reorder'])->name('settings.request-types.reorder');
+    Route::put('/settings/request-types/{requestType}', [RequestTypeController::class, 'update'])->name('settings.request-types.update');
+    Route::delete('/settings/request-types/{requestType}', [RequestTypeController::class, 'destroy'])->name('settings.request-types.destroy');
 });
 
 // Guest-facing pages

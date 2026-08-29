@@ -10,6 +10,8 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class CertificatePdfService
 {
+    public function __construct(private CertificateSignatureService $signatures) {}
+
     public function make(Certificate $certificate): DomPdf
     {
         $certificate->load(['visitorLog', 'issuer']);
@@ -25,14 +27,19 @@ class CertificatePdfService
                 ->generate($verifyUrl)
         );
 
+        $signer = $this->signatures->signerPayload($certificate);
+
         return Pdf::loadView('pdf.certificate_of_appearance', [
-            'visitor_name'   => $certificate->visitorLog?->visitor_name ?? '_______________',
-            'address'        => $certificate->visitorLog?->address ?? '',
-            'purpose'        => $certificate->visitorLog?->purpose ?? '_______________',
-            'day'            => $issuedAt->format('j'),
-            'month_year'     => $issuedAt->format('F Y'),
-            'certificate_no' => $certificate->certificate_no,
-            'qr_code'        => $qrCode,
+            'visitor_name'       => $certificate->visitorLog?->visitor_name ?? '_______________',
+            'address'            => $certificate->visitorLog?->address ?? '',
+            'purpose'            => $certificate->visitorLog?->purpose ?? '_______________',
+            'day'                => $issuedAt->format('j'),
+            'month_year'         => $issuedAt->format('F Y'),
+            'certificate_no'     => $certificate->certificate_no,
+            'qr_code'            => $qrCode,
+            'signer_name'        => $signer['name'],
+            'signer_title'       => $signer['title'],
+            'signer_signature'   => $this->signatures->signatureDataUri($certificate->signer_signature_path),
         ])->setOption([
             'defaultFont'             => 'serif',
             'isRemoteEnabled'         => true,

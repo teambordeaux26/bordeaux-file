@@ -74,37 +74,61 @@
 
                     <div class="md:col-span-2">
                         <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
-                            Home Address
+                            Barangay (Oas, Albay) <span class="text-red-500">*</span>
                         </label>
-                        <input
-                            v-model="form.requester_address"
-                            class="soft-input"
-                            :class="{ 'border-red-400 focus:border-red-400 focus:ring-red-400': form.errors.requester_address }"
-                            placeholder="Barangay, Municipality / City, Province"
+                        <SearchableSelect
+                            :model-value="form.requester_address"
+                            :options="barangays"
+                            :input-class="{ 'border-red-400 focus:border-red-400 focus:ring-red-400': form.errors.requester_address }"
+                            placeholder="Search or select a barangay in Oas"
+                            @update:model-value="form.requester_address = $event"
                         />
                         <p v-if="form.errors.requester_address" class="mt-1 text-xs text-red-600">
                             {{ form.errors.requester_address }}
                         </p>
                     </div>
 
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
-                            Request Type <span class="text-red-500">*</span>
-                        </label>
-                        <select
-                            v-model="form.request_type"
-                            class="soft-select"
-                            :class="{ 'border-red-400 focus:border-red-400 focus:ring-red-400': form.errors.request_type }"
-                        >
-                            <option value="">— Select a request type —</option>
-                            <option>Certificate of Appearance</option>
-                            <option>Document Copy</option>
-                            <option>Meeting Request</option>
-                            <option>Other</option>
-                        </select>
-                        <p v-if="form.errors.request_type" class="mt-1 text-xs text-red-600">
-                            {{ form.errors.request_type }}
-                        </p>
+                    <div class="md:col-span-2 grid gap-5 md:grid-cols-2">
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                                Request Type <span class="text-red-500">*</span>
+                            </label>
+                            <select
+                                v-model="form.request_type_id"
+                                class="soft-select"
+                                :class="{ 'border-red-400 focus:border-red-400 focus:ring-red-400': form.errors.request_type_id }"
+                            >
+                                <option value="">— Select a request type —</option>
+                                <option
+                                    v-for="type in availableRequestTypes"
+                                    :key="type.id"
+                                    :value="type.id"
+                                >
+                                    {{ type.name }}
+                                </option>
+                            </select>
+                            <p v-if="availableRequestTypes.length === 0" class="mt-1 text-xs text-amber-600">
+                                Request types are not available yet. Please contact the office.
+                            </p>
+                            <p v-if="form.errors.request_type_id" class="mt-1 text-xs text-red-600">
+                                {{ form.errors.request_type_id }}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                                Purpose
+                            </label>
+                            <input
+                                class="soft-input bg-gray-50"
+                                type="text"
+                                readonly
+                                :value="selectedType?.purpose || 'Select a request type to see its purpose'"
+                            />
+                            <p class="mt-1 text-xs text-gray-500">
+                                This purpose is set by the office and saved with your request.
+                            </p>
+                        </div>
                     </div>
 
                     <div class="md:col-span-2">
@@ -154,17 +178,34 @@
 </template>
 
 <script setup>
-import { Head, useForm } from "@inertiajs/vue3";
+import { computed } from "vue";
+import { Head, useForm, usePage } from "@inertiajs/vue3";
 import GuestLayout from "../../Layouts/GuestLayout.vue";
+import SearchableSelect from "../../Components/SearchableSelect.vue";
+
+const props = defineProps({
+    requestTypes: { type: Array, default: () => [] },
+});
+
+const page = usePage();
+const barangays = computed(() => page.props.oasBarangays ?? []);
 
 const form = useForm({
     requester_name:    '',
     requester_email:   '',
     requester_phone:   '',
     requester_address: '',
-    request_type:      '',
+    request_type_id:   '',
     details:           '',
 });
+
+const availableRequestTypes = computed(() =>
+    (props.requestTypes ?? []).filter((type) => type.is_active !== false)
+);
+
+const selectedType = computed(() =>
+    availableRequestTypes.value.find((type) => String(type.id) === String(form.request_type_id)) ?? null
+);
 
 function submit() {
     form.post('/requests');

@@ -55,11 +55,15 @@
 
             <div class="bg-white border border-gray-300 shadow-sm">
                 <div class="px-5 py-4 border-b border-gray-200">
-                    <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">Issued By</p>
-                    <h2 class="text-base font-bold text-[#003366]">Certificate Generator</h2>
+                    <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">Signed By</p>
+                    <h2 class="text-base font-bold text-[#003366]">Certificate Signatory</h2>
                 </div>
 
                 <div class="px-5 py-4 grid gap-4 sm:grid-cols-2 text-sm">
+                    <div v-if="issuer.signature_url" class="sm:col-span-2">
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1">Signature</p>
+                        <img :src="issuer.signature_url" alt="Official signature" class="h-16 max-w-xs object-contain" />
+                    </div>
                     <div>
                         <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Name</p>
                         <p class="text-gray-900 font-medium">{{ issuer.name }}</p>
@@ -69,12 +73,8 @@
                         <p class="text-gray-900">{{ issuer.position }}</p>
                     </div>
                     <div>
-                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Department</p>
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Office</p>
                         <p class="text-gray-900">{{ issuer.department }}</p>
-                    </div>
-                    <div v-if="issuer.email">
-                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Email</p>
-                        <p class="text-gray-900">{{ issuer.email }}</p>
                     </div>
                 </div>
             </div>

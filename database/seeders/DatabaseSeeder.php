@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\DocumentCategory;
+use App\Models\RequestType;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -37,11 +38,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        DocumentCategory::query()->insert([
-            ['name' => 'Memoranda', 'description' => 'Internal memoranda and advisories.'],
-            ['name' => 'Resolutions', 'description' => 'Official resolutions and approvals.'],
-            ['name' => 'Reports', 'description' => 'Reports and summaries from departments.'],
-            ['name' => 'Administrative Records', 'description' => 'Administrative records and files.'],
-        ]);
+        DocumentCategory::syncCatalog();
+        RequestType::syncDefaults();
     }
 }

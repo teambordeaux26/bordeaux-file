@@ -61,7 +61,7 @@
                                 :disabled="processing === item.id + '-reject'"
                                 @click="reject(item)"
                             >
-                                {{ processing === item.id + '-reject' ? '…' : 'Reject' }}
+                                {{ processing === item.id + '-reject' ? '…' : 'Disapprove' }}
                             </button>
                         </div>
                     </div>
@@ -99,7 +99,7 @@ function returnDoc(item) {
 }
 
 function reject(item) {
-    if (!confirm(`Reject "${item.title}"? This action cannot be undone.`)) return;
+    if (!confirm(`Disapprove "${item.title}"? This action cannot be undone.`)) return;
     processing.value = item.id + '-reject';
     router.put(`/approvals/${item.id}/reject`, {}, {
         onFinish: () => { processing.value = null; },

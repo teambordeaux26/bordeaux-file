@@ -139,6 +139,8 @@ const statusClass = (status) => {
         Approved: "bg-green-100 text-green-800",
         "Under Review": "bg-yellow-100 text-yellow-800",
         Returned: "bg-red-100 text-red-700",
+        Disapproved: "bg-rose-100 text-rose-800",
+        Rejected: "bg-rose-100 text-rose-800",
         Archived: "bg-gray-100 text-gray-600",
         Pending: "bg-blue-50 text-[#003366]",
     };

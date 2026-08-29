@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\DocumentCategory;
+use App\Models\RequestType;
 use App\Models\SystemSetting;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -22,10 +24,31 @@ class SettingsController extends Controller
                 'public_search_fields'     => $settings->public_search_fields ?? SystemSetting::defaultPublicSearchFields(),
                 'public_search_categories' => $settings->public_search_categories ?? [],
                 'employee_pages'           => $settings->employee_pages ?? SystemSetting::defaultEmployeePages(),
+                'official_signer_user_id'  => $settings->official_signer_user_id,
             ],
+            'signers' => User::query()
+                ->where('status', 'active')
+                ->whereIn('role', ['admin', 'employee'])
+                ->orderBy('name')
+                ->get(['id', 'name', 'position', 'signature_path'])
+                ->map(fn (User $user) => [
+                    'id'            => $user->id,
+                    'name'          => $user->name,
+                    'position'      => $user->position ?: 'Staff',
+                    'has_signature' => filled($user->signature_path),
+                ]),
+            'requestTypes'       => RequestType::settingsPayload(),
             'pageOptions'        => SystemSetting::employeePageOptions(),
             'publicFieldOptions' => SystemSetting::publicSearchFieldOptions(),
-            'categories'         => DocumentCategory::orderBy('name')->get(['id', 'name']),
+            'categories'         => DocumentCategory::query()
+                ->with('parent')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($cat) => [
+                    'id'   => $cat->id,
+                    'name' => $cat->label(),
+                ]),
         ]);
     }
 
@@ -43,6 +66,7 @@ class SettingsController extends Controller
             'public_search_categories.*' => 'integer|exists:document_categories,id',
             'employee_pages'           => 'required|array|min:1',
             'employee_pages.*'         => 'in:' . implode(',', $pageKeys),
+            'official_signer_user_id'  => 'nullable|exists:users,id',
         ]);
 
         $settings = SystemSetting::current();
@@ -52,6 +76,7 @@ class SettingsController extends Controller
             'public_search_fields'     => $validated['public_search_fields'],
             'public_search_categories' => $validated['public_search_categories'] ?? [],
             'employee_pages'           => $validated['employee_pages'],
+            'official_signer_user_id'  => $validated['official_signer_user_id'] ?: null,
         ]);
 
         AuditLog::create([
