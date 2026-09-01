@@ -67,15 +67,27 @@
                                 <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1.5" for="password">
                                     Password
                                 </label>
-                                <input
-                                    id="password"
-                                    v-model="form.password"
-                                    type="password"
-                                    class="w-full border border-gray-300 bg-gray-50 px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366]"
-                                    autocomplete="current-password"
-                                    placeholder="Enter your password"
-                                    required
-                                />
+                                <div class="relative">
+                                    <input
+                                        id="password"
+                                        v-model="form.password"
+                                        :type="showPassword ? 'text' : 'password'"
+                                        class="w-full border border-gray-300 bg-gray-50 px-3 py-2.5 sm:py-2 pr-11 text-base sm:text-sm text-gray-900 focus:border-[#003366] focus:outline-none focus:ring-1 focus:ring-[#003366]"
+                                        autocomplete="current-password"
+                                        placeholder="Enter your password"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center justify-center px-3 text-gray-500 hover:text-[#003366] focus:outline-none focus:text-[#003366]"
+                                        :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                                        :title="showPassword ? 'Hide password' : 'Show password'"
+                                        @click="showPassword = !showPassword"
+                                    >
+                                        <EyeOff v-if="showPassword" class="h-4 w-4" aria-hidden="true" />
+                                        <Eye v-else class="h-4 w-4" aria-hidden="true" />
+                                    </button>
+                                </div>
                                 <p v-if="form.errors.password" class="mt-1 text-xs text-red-600">
                                     {{ form.errors.password }}
                                 </p>
@@ -153,12 +165,14 @@
 <script setup>
 import { Head, Link, useForm, usePage } from "@inertiajs/vue3";
 import { computed, ref } from "vue";
+import { Eye, EyeOff } from "@lucide/vue";
 import TurnstileWidget from "../Components/TurnstileWidget.vue";
 
 const page = usePage();
 const site = computed(() => page.props.site ?? {});
 const turnstileSiteKey = computed(() => page.props.turnstileSiteKey ?? "");
 const turnstileRef = ref(null);
+const showPassword = ref(false);
 
 const form = useForm({
     email: "",
