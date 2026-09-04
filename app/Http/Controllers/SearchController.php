@@ -11,6 +11,7 @@ use App\Models\VisitorLog;
 use App\Support\DocumentStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class SearchController extends Controller
 {
@@ -66,7 +67,8 @@ class SearchController extends Controller
     {
         $statusQuery = str_replace(' ', '_', strtolower($q));
 
-        return Document::with(['category.parent', 'submitter', 'reviewer'])
+        return Document::with(['category.parent', 'submitter', 'reviewer', 'handler'])
+            ->visibleTo(Auth::user())
             ->where(function (Builder $builder) use ($q, $statusQuery) {
                 $builder->where('title', 'like', "%{$q}%")
                     ->orWhere('tracking_number', 'like', "%{$q}%")
@@ -91,6 +93,10 @@ class SearchController extends Controller
                     ->orWhereHas('reviewer', function (Builder $userQuery) use ($q) {
                         $userQuery->where('name', 'like', "%{$q}%")
                             ->orWhere('email', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('handler', function (Builder $userQuery) use ($q) {
+                        $userQuery->where('name', 'like', "%{$q}%")
+                            ->orWhere('email', 'like', "%{$q}%");
                     });
             })
             ->latest()
@@ -105,6 +111,7 @@ class SearchController extends Controller
                     $document->category?->label(),
                     $document->priority,
                     $document->submitter?->name,
+                    $document->handler?->name ? 'Handling: '.$document->handler->name : null,
                     $document->created_at->format('M d, Y'),
                 ])),
                 'status'    => DocumentStatus::label($document->status),

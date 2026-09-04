@@ -60,6 +60,20 @@
                         <p class="text-gray-900">{{ document.owner }}</p>
                     </div>
                     <div>
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Currently Handling</p>
+                        <p class="font-semibold text-[#003366]">{{ document.handler?.name ?? 'Unassigned' }}</p>
+                        <p v-if="document.handler" class="text-xs text-gray-500">{{ document.handler.position }}</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Access</p>
+                        <p class="text-gray-900">
+                            {{ document.access?.restricted ? 'Selected staff only' : 'All office staff' }}
+                        </p>
+                        <p v-if="document.access?.restricted" class="text-xs text-gray-500">
+                            {{ document.access.users.map((user) => user.name).join(', ') }}
+                        </p>
+                    </div>
+                    <div>
                         <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Submitted On</p>
                         <p class="text-gray-900">{{ document.submitted }}</p>
                     </div>
@@ -115,24 +129,117 @@
                     No file was attached to this document.
                 </div>
             </SectionCard>
+
+            <SectionCard
+                title="Handling trail"
+                eyebrow="Trace"
+                subtitle="Who moved this document and when."
+            >
+                <ol v-if="document.trail?.length" class="space-y-3">
+                    <li
+                        v-for="step in document.trail"
+                        :key="step.id"
+                        class="border border-gray-200 bg-white px-4 py-3"
+                    >
+                        <div class="flex flex-wrap items-baseline justify-between gap-2">
+                            <p class="text-sm font-semibold text-[#003366]">{{ step.status }}</p>
+                            <p class="text-[11px] text-gray-400">{{ step.at }}</p>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-600">
+                            Handled by <span class="font-semibold text-gray-800">{{ step.by }}</span>
+                        </p>
+                        <p v-if="step.remarks" class="mt-1 text-sm text-gray-700">{{ step.remarks }}</p>
+                    </li>
+                </ol>
+                <p v-else class="text-sm text-gray-500">
+                    No workflow steps yet. Activity appears here as staff start review, forward, approve, or return the file.
+                </p>
+            </SectionCard>
+
+            <SectionCard
+                v-if="document.access?.can_edit"
+                title="Access & handler"
+                eyebrow="Sharing"
+                subtitle="Choose who may open this file and who currently has it."
+            >
+                <form class="space-y-5" @submit.prevent="saveSharing">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                            Who can access this document
+                        </label>
+                        <p class="mb-2 text-xs text-gray-500">
+                            Leave empty so all office staff can open it. The owner always keeps access.
+                        </p>
+                        <StaffChecklist v-model="sharing.access_user_ids" :options="staffOptions" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="handled_by">
+                            Currently handling
+                        </label>
+                        <select id="handled_by" v-model="sharing.handled_by" class="soft-select">
+                            <option value="">Unassigned</option>
+                            <option v-for="person in staff" :key="person.id" :value="person.id">
+                                {{ person.label }}
+                            </option>
+                        </select>
+                    </div>
+                    <button type="submit" class="soft-button" :disabled="sharing.processing">
+                        {{ sharing.processing ? 'Saving…' : 'Save access & handler' }}
+                    </button>
+                </form>
+            </SectionCard>
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { Head, Link } from "@inertiajs/vue3";
+import { computed, ref, watch } from "vue";
+import { Head, Link, useForm } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
+import StaffChecklist from "../../Components/StaffChecklist.vue";
 
-defineProps({
+const props = defineProps({
     document:     { type: Object, required: true },
     preview_url:  { type: String, default: null },
     download_url: { type: String, default: null },
+    staff:        { type: Array, default: () => [] },
 });
 
 const loading = ref(true);
+
+const staffOptions = computed(() =>
+    props.staff.filter((person) => Number(person.id) !== Number(props.document.owner_id))
+);
+
+const sharing = useForm({
+    access_user_ids: [],
+    handled_by: "",
+});
+
+function hydrateSharing() {
+    const ownerId = Number(props.document.owner_id);
+    sharing.access_user_ids = (props.document.access?.user_ids ?? [])
+        .map((id) => Number(id))
+        .filter((id) => id !== ownerId);
+    sharing.handled_by = props.document.handler?.id ?? "";
+}
+
+watch(
+    () => [props.document.access, props.document.handler],
+    hydrateSharing,
+    { immediate: true, deep: true }
+);
+
+function saveSharing() {
+    sharing
+        .transform((data) => ({
+            access_user_ids: data.access_user_ids || [],
+            handled_by: data.handled_by || null,
+        }))
+        .put(`/documents/${props.document.id}/sharing`, { preserveScroll: true });
+}
 
 const statusClass = (status) => {
     const map = {

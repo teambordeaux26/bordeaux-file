@@ -118,6 +118,7 @@
                                 <th class="px-4 py-3">Priority</th>
                                 <th class="px-4 py-3">Status</th>
                                 <th class="px-4 py-3">Submitted By</th>
+                                <th class="px-4 py-3">Currently Handling</th>
                                 <th class="px-4 py-3">Expires</th>
                                 <th class="px-4 py-3">Updated</th>
                                 <th class="px-4 py-3 text-right">Actions</th>
@@ -126,7 +127,7 @@
                         <tbody class="divide-y divide-gray-200 bg-white">
                             <tr v-if="rows.length === 0">
                                 <td
-                                    colspan="10"
+                                    colspan="11"
                                     class="px-4 py-8 text-center text-sm text-gray-400"
                                 >
                                     No documents found.
@@ -180,6 +181,12 @@
                                     class="px-4 py-3 text-gray-600 whitespace-nowrap"
                                 >
                                     {{ doc.owner }}
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <p class="text-gray-900">{{ doc.handler }}</p>
+                                    <p v-if="doc.restricted" class="text-[10px] font-semibold uppercase tracking-wider text-[#003366]">
+                                        Restricted access
+                                    </p>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <p class="text-xs text-gray-700">{{ doc.expires_at }}</p>

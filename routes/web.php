@@ -52,6 +52,7 @@ Route::middleware(['auth', 'role:admin,employee', 'employee.page'])->group(funct
     Route::post('/documents',                     [DocumentController::class, 'store'])->name('documents.store');
     Route::get('/documents/{document}/edit',      [DocumentController::class, 'edit'])->name('documents.edit');
     Route::put('/documents/{document}',           [DocumentController::class, 'update'])->name('documents.update');
+    Route::put('/documents/{document}/sharing',   [DocumentController::class, 'updateSharing'])->name('documents.sharing');
     Route::get('/documents/{document}',           [DocumentController::class, 'show'])->name('documents.show');
     Route::get('/documents/{document}/file',      [DocumentController::class, 'file'])->name('documents.file');
 

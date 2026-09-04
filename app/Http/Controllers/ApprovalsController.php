@@ -12,7 +12,8 @@ class ApprovalsController extends Controller
 {
     public function index()
     {
-        $documents = Document::with(['category.parent', 'submitter'])
+        $documents = Document::with(['category.parent', 'submitter', 'handler'])
+            ->visibleTo(Auth::user())
             ->whereIn('status', ['pending', 'under_review'])
             ->latest()
             ->get()
@@ -22,6 +23,7 @@ class ApprovalsController extends Controller
                 'title'    => $d->title,
                 'category' => $d->category?->label() ?? '—',
                 'owner'    => $d->submitter?->name ?? '—',
+                'handler'  => $d->handler?->name ?? 'Unassigned',
                 'priority' => $d->priority,
                 'age'      => $d->created_at->diffForHumans(),
             ]);
@@ -31,10 +33,13 @@ class ApprovalsController extends Controller
 
     public function approve(Document $document)
     {
+        abort_unless($document->canBeAccessedBy(Auth::user()), 403);
+
         $document->update([
             'status'      => 'approved',
             'approved_at' => now(),
             'reviewed_by' => Auth::id(),
+            'handled_by'  => Auth::id(),
         ]);
 
         AuditLog::create([
@@ -50,10 +55,13 @@ class ApprovalsController extends Controller
 
     public function returnDoc(Request $request, Document $document)
     {
+        abort_unless($document->canBeAccessedBy(Auth::user()), 403);
+
         $document->update([
             'status'      => 'returned',
             'returned_at' => now(),
             'reviewed_by' => Auth::id(),
+            'handled_by'  => $document->submitted_by,
         ]);
 
         AuditLog::create([
@@ -69,9 +77,12 @@ class ApprovalsController extends Controller
 
     public function reject(Document $document)
     {
+        abort_unless($document->canBeAccessedBy(Auth::user()), 403);
+
         $document->update([
             'status'      => 'rejected',
             'reviewed_by' => Auth::id(),
+            'handled_by'  => Auth::id(),
         ]);
 
         AuditLog::create([

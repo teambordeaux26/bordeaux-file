@@ -6,12 +6,14 @@ use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\DocumentCategory;
 use App\Models\DocumentStatusUpdate;
+use App\Models\User;
 use App\Services\DocumentRetentionService;
 use App\Support\DocumentStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -30,7 +32,8 @@ class DocumentController extends Controller
             'report_period' => 'nullable|in:weekly,monthly',
         ]);
 
-        $query = Document::with(['category.parent', 'submitter'])
+        $query = Document::with(['category.parent', 'submitter', 'handler', 'allowedUsers'])
+            ->visibleTo(Auth::user())
             ->where('status', '!=', 'archived');
 
         if (! empty($filters['q'])) {
@@ -60,6 +63,7 @@ class DocumentController extends Controller
             ->through(fn ($doc) => $this->listPayload($doc));
 
         $counts = Document::query()
+            ->visibleTo(Auth::user())
             ->where('status', '!=', 'archived')
             ->selectRaw('category_id, COUNT(*) as aggregate')
             ->groupBy('category_id')
@@ -118,6 +122,8 @@ class DocumentController extends Controller
             'categories'       => DocumentCategory::treeForForms(),
             'refNumber'        => $this->generateReferenceNumber(),
             'retentionOptions' => $this->retentionOptions(),
+            'staff'            => User::staffOptions(Auth::id()),
+            'currentUserId'    => Auth::id(),
         ]);
     }
 
@@ -130,6 +136,9 @@ class DocumentController extends Controller
             'description'    => 'nullable|string|max:2000',
             'retention_days' => 'required|integer|in:7,30,90,180,365,730,1825',
             'file'           => 'nullable|file|mimes:pdf,doc,docx,png,jpg,jpeg|max:10240',
+            'access_user_ids'   => 'nullable|array',
+            'access_user_ids.*' => ['integer', $this->staffUserRule()],
+            'handled_by'        => ['nullable', 'integer', $this->staffUserRule()],
         ]);
 
         $this->assertLeafCategory((int) $validated['category_id']);
@@ -142,7 +151,7 @@ class DocumentController extends Controller
         $trackingNumber = $this->generateTrackingNumber();
         $refNumber      = $this->generateReferenceNumber();
 
-        Document::create([
+        $document = Document::create([
             'tracking_number' => $trackingNumber,
             'reference_no'    => $refNumber,
             'title'           => $validated['title'],
@@ -154,7 +163,20 @@ class DocumentController extends Controller
             'expires_at'      => now()->addDays((int) $validated['retention_days']),
             'status'          => 'pending',
             'submitted_by'    => Auth::id(),
+            'handled_by'      => $validated['handled_by'] ?? null,
             'submitted_at'    => now(),
+        ]);
+
+        $document->syncAllowedUsers($validated['access_user_ids'] ?? []);
+        $document->load('handler');
+
+        DocumentStatusUpdate::create([
+            'document_id' => $document->id,
+            'status'      => 'pending',
+            'remarks'     => $document->handler
+                ? 'Submitted and assigned to '.$document->handler->name.'.'
+                : 'Submitted for review.',
+            'updated_by'  => Auth::id(),
         ]);
 
         AuditLog::create([
@@ -170,7 +192,15 @@ class DocumentController extends Controller
 
     public function show(Document $document)
     {
-        $document->load(['category.parent', 'submitter']);
+        $this->authorizeDocumentAccess($document);
+
+        $document->load([
+            'category.parent',
+            'submitter',
+            'handler',
+            'allowedUsers',
+            'statusUpdates' => fn ($query) => $query->with('updater')->orderBy('id'),
+        ]);
 
         $previewable = $document->file_path && $this->isPreviewable($document->file_path);
 
@@ -185,6 +215,32 @@ class DocumentController extends Controller
                 'status'      => DocumentStatus::label($document->status),
                 'priority'    => $document->priority,
                 'owner'       => $document->submitter?->name ?? '—',
+                'owner_id'    => $document->submitted_by,
+                'handler'     => $document->handler ? [
+                    'id'       => $document->handler->id,
+                    'name'     => $document->handler->name,
+                    'position' => $document->handler->position ?: 'Staff',
+                ] : null,
+                'access'      => [
+                    'restricted' => $document->isRestricted(),
+                    'users'      => $document->allowedUsers
+                        ->map(fn (User $user) => [
+                            'id'       => $user->id,
+                            'name'     => $user->name,
+                            'position' => $user->position ?: 'Staff',
+                        ])
+                        ->values()
+                        ->all(),
+                    'user_ids'   => $document->allowedUsers->pluck('id')->all(),
+                    'can_edit'   => Auth::user()->role === 'admin' || $document->submitted_by === Auth::id(),
+                ],
+                'trail'       => $document->statusUpdates->map(fn (DocumentStatusUpdate $update) => [
+                    'id'      => $update->id,
+                    'status'  => DocumentStatus::label($update->status),
+                    'remarks' => $update->remarks,
+                    'by'      => $update->updater?->name ?? '—',
+                    'at'      => $update->created_at?->format('M d, Y g:i A'),
+                ])->values()->all(),
                 'submitted'   => $document->created_at->format('M d, Y H:i'),
                 'updated'     => $document->updated_at->format('M d, Y H:i'),
                 'retention'   => $document->retention_days
@@ -200,7 +256,38 @@ class DocumentController extends Controller
             'download_url' => $document->file_path
                 ? route('documents.file', $document->id)
                 : null,
+            'staff'        => User::staffOptions(),
         ]);
+    }
+
+    public function updateSharing(Request $request, Document $document)
+    {
+        $this->authorizeDocumentAccess($document);
+
+        $user = Auth::user();
+        if ($user->role !== 'admin' && $document->submitted_by !== $user->id) {
+            abort(403, 'Only the owner or an admin can change document access.');
+        }
+
+        $validated = $request->validate([
+            'access_user_ids'   => 'nullable|array',
+            'access_user_ids.*' => ['integer', $this->staffUserRule()],
+            'handled_by'        => ['nullable', 'integer', $this->staffUserRule()],
+        ]);
+
+        $document->update([
+            'handled_by' => $validated['handled_by'] ?? null,
+        ]);
+        $document->syncAllowedUsers($validated['access_user_ids'] ?? []);
+
+        AuditLog::create([
+            'user_id'     => $user->id,
+            'action'      => 'Document Access Updated',
+            'description' => "Updated access and handler for {$document->tracking_number}.",
+            'ip_address'  => $request->ip(),
+        ]);
+
+        return back()->with('success', "Access and handler for {$document->tracking_number} saved.");
     }
 
     /**
@@ -250,6 +337,7 @@ class DocumentController extends Controller
     public function edit(Document $document)
     {
         $this->authorizeEdit($document);
+        $this->authorizeDocumentAccess($document);
 
         $document->load('category.parent');
         $context = $this->returnContext($document);
@@ -317,6 +405,7 @@ class DocumentController extends Controller
             $updates['status']       = 'pending';
             $updates['submitted_at'] = now();
             $updates['returned_at']  = null;
+            $updates['handled_by']   = null;
         }
 
         $document->update($updates);
@@ -400,6 +489,8 @@ class DocumentController extends Controller
 
     public function file(Document $document)
     {
+        $this->authorizeDocumentAccess($document);
+
         if (! $document->file_path || ! Storage::disk('public')->exists($document->file_path)) {
             abort(404);
         }
@@ -417,6 +508,18 @@ class DocumentController extends Controller
         return Storage::disk('public')->download($document->file_path, $filename);
     }
 
+    protected function authorizeDocumentAccess(Document $document): void
+    {
+        abort_unless($document->canBeAccessedBy(Auth::user()), 403, 'You do not have access to this document.');
+    }
+
+    private function staffUserRule(): \Illuminate\Validation\Rules\Exists
+    {
+        return Rule::exists('users', 'id')->where(function ($query) {
+            $query->whereIn('role', ['admin', 'employee'])->where('status', 'active');
+        });
+    }
+
     private function listPayload(Document $doc): array
     {
         return [
@@ -432,6 +535,8 @@ class DocumentController extends Controller
             'status'        => DocumentStatus::label($doc->status),
             'priority'      => $doc->priority,
             'owner'         => $doc->submitter?->name ?? '—',
+            'handler'       => $doc->handler?->name ?? 'Unassigned',
+            'restricted'    => $doc->allowedUsers->isNotEmpty(),
             'updated'       => $doc->updated_at->diffForHumans(),
             'retention'     => $doc->retention_days
                 ? DocumentRetentionService::formatRetention($doc->retention_days)

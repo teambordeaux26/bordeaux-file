@@ -70,7 +70,8 @@ class WorkflowController extends Controller
         $user   = Auth::user();
         $stages = static::stages();
 
-        $documents = Document::with(['category.parent', 'submitter', 'reviewer'])
+        $documents = Document::with(['category.parent', 'submitter', 'reviewer', 'handler'])
+            ->visibleTo($user)
             ->whereIn('status', array_keys($stages))
             ->orderBy('updated_at', 'desc')
             ->get();
@@ -81,6 +82,7 @@ class WorkflowController extends Controller
         }
 
         $owners     = [];
+        $handlers   = [];
         $categories = [];
 
         foreach ($documents as $d) {
@@ -93,6 +95,13 @@ class WorkflowController extends Controller
                 $owners[$d->submitter->id] = [
                     'id'   => $d->submitter->id,
                     'name' => $d->submitter->name,
+                ];
+            }
+
+            if ($d->handler && ! isset($handlers[$d->handler->id])) {
+                $handlers[$d->handler->id] = [
+                    'id'   => $d->handler->id,
+                    'name' => $d->handler->name,
                 ];
             }
 
@@ -115,6 +124,8 @@ class WorkflowController extends Controller
                 'owner_id'     => $d->submitted_by,
                 'reviewer'     => $d->reviewer?->name,
                 'reviewer_id'  => $d->reviewed_by,
+                'handler'      => $d->handler?->name,
+                'handler_id'   => $d->handled_by,
                 'priority'     => $d->priority,
                 'updated'      => optional($d->updated_at)->diffForHumans(),
                 'updated_ts'   => optional($d->updated_at)->timestamp,
@@ -156,6 +167,7 @@ class WorkflowController extends Controller
             ],
             'filters'    => [
                 'owners'     => array_values($owners),
+                'handlers'   => array_values($handlers),
                 'categories' => array_values($categories),
                 'priorities' => ['Urgent', 'Priority', 'Standard'],
             ],
@@ -186,7 +198,7 @@ class WorkflowController extends Controller
                 break;
 
             case 'under_review':
-                if ($d->reviewed_by === $user->id || $isAdmin) {
+                if ($d->reviewed_by === $user->id || $d->handled_by === $user->id || $isAdmin) {
                     $actions[] = ['key' => 'forward', 'label' => 'Forward to Approval', 'variant' => 'primary'];
                     $actions[] = ['key' => 'return', 'label' => 'Return to Owner', 'variant' => 'warn', 'needs_remarks' => true];
                 }
@@ -228,7 +240,7 @@ class WorkflowController extends Controller
         $remarks  = $data['remarks'] ?? null;
 
         $allowed = collect(static::actionsFor($document, $user))->pluck('key')->all();
-        if (! in_array($action, $allowed, true)) {
+        if (! in_array($action, $allowed, true) || ! $document->canBeAccessedBy($user)) {
             return back()->with('error', 'You are not allowed to perform this action.');
         }
 
@@ -237,37 +249,37 @@ class WorkflowController extends Controller
         [$newStatus, $updates, $auditMsg] = match ($action) {
             'submit', 'resubmit' => [
                 'pending',
-                ['submitted_at' => now(), 'returned_at' => null],
+                ['submitted_at' => now(), 'returned_at' => null, 'handled_by' => null],
                 "submitted for review",
             ],
             'start_review' => [
                 'under_review',
-                ['reviewed_by' => $user->id],
+                ['reviewed_by' => $user->id, 'handled_by' => $user->id],
                 "picked up for review",
             ],
             'forward' => [
                 'for_approval',
-                [],
+                ['handled_by' => $user->id],
                 "forwarded for approval",
             ],
             'approve' => [
                 'approved',
-                ['approved_at' => now()],
+                ['approved_at' => now(), 'handled_by' => $user->id],
                 "approved",
             ],
             'release' => [
                 'released',
-                ['released_at' => now()],
+                ['released_at' => now(), 'handled_by' => $user->id],
                 "released",
             ],
             'return' => [
                 'returned',
-                ['returned_at' => now()],
+                ['returned_at' => now(), 'handled_by' => $document->submitted_by],
                 "returned to owner",
             ],
             'reject' => [
                 'rejected',
-                [],
+                ['handled_by' => $user->id],
                 "disapproved",
             ],
             default => [null, [], null],
@@ -305,8 +317,8 @@ class WorkflowController extends Controller
                 'does'  => 'Creates the draft, submits it, and resubmits when returned.',
             ],
             [
-                'role'  => 'Reviewer (any employee who is not the owner)',
-                'does'  => 'Picks up a submission, verifies it, then forwards to admin or returns to the owner.',
+                'role'  => 'Current handler',
+                'does'  => 'The person now processing the file. This updates when someone starts review, forwards, approves, or returns it.',
             ],
             [
                 'role'  => 'Admin',

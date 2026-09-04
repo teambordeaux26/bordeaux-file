@@ -119,6 +119,33 @@
                         <p v-if="form.errors.description" class="mt-1 text-xs text-red-600">{{ form.errors.description }}</p>
                     </div>
 
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                            Who can access this document
+                        </label>
+                        <p class="mb-2 text-xs text-gray-500">
+                            Leave empty so all office staff can open it. Select people to restrict access to them — you always keep access.
+                        </p>
+                        <StaffChecklist v-model="form.access_user_ids" :options="staff" />
+                        <p v-if="form.errors.access_user_ids" class="mt-1 text-xs text-red-600">{{ form.errors.access_user_ids }}</p>
+                    </div>
+
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="handled_by">
+                            Currently handling
+                        </label>
+                        <select id="handled_by" v-model="form.handled_by" class="soft-select">
+                            <option value="">Unassigned — waiting for a reviewer to pick it up</option>
+                            <option v-for="person in handlerOptions" :key="person.id" :value="person.id">
+                                {{ person.label }}
+                            </option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">
+                            This person is shown as the current handler. It updates automatically as the document moves through workflow.
+                        </p>
+                        <p v-if="form.errors.handled_by" class="mt-1 text-xs text-red-600">{{ form.errors.handled_by }}</p>
+                    </div>
+
                     <!-- File Upload -->
                     <div class="lg:col-span-2">
                         <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
@@ -159,34 +186,48 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
 import CategoryFields from "../../Components/CategoryFields.vue";
+import StaffChecklist from "../../Components/StaffChecklist.vue";
 
 const props = defineProps({
     categories:       { type: Array, default: () => [] },
     refNumber:        { type: String, default: '' },
     retentionOptions: { type: Array, default: () => [] },
+    staff:            { type: Array, default: () => [] },
+    currentUserId:    { type: Number, default: null },
 });
 
 const form = useForm({
-    title:          '',
-    category_id:    null,
-    priority:       'Standard',
-    retention_days: 7,
-    description:    '',
-    file:           null,
+    title:            '',
+    category_id:      null,
+    priority:         'Standard',
+    retention_days:   7,
+    description:      '',
+    file:             null,
+    access_user_ids:  [],
+    handled_by:       '',
 });
+
+const handlerOptions = computed(() => props.staff);
 
 const handleFile = (e) => {
     form.file = e.target.files[0] ?? null;
 };
 
 const submit = () => {
-    form.post('/documents', {
-        forceFormData: true,
-    });
+    form
+        .transform((data) => ({
+            ...data,
+            handled_by: data.handled_by || null,
+            access_user_ids: data.access_user_ids || [],
+        }))
+        .post('/documents', {
+            forceFormData: true,
+        });
 };
 </script>

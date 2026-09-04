@@ -74,6 +74,33 @@ class User extends Authenticatable
         return $this->hasMany(Document::class, 'reviewed_by');
     }
 
+    public function documentsHandled(): HasMany
+    {
+        return $this->hasMany(Document::class, 'handled_by');
+    }
+
+    /**
+     * @return list<array{id: int, name: string, role: string, department: ?string, position: string, label: string}>
+     */
+    public static function staffOptions(?int $exceptId = null): array
+    {
+        return static::query()
+            ->where('status', 'active')
+            ->whereIn('role', ['admin', 'employee'])
+            ->when($exceptId, fn ($query) => $query->where('id', '!=', $exceptId))
+            ->orderBy('name')
+            ->get(['id', 'name', 'role', 'department', 'position'])
+            ->map(fn (self $user) => [
+                'id'         => $user->id,
+                'name'       => $user->name,
+                'role'       => $user->role,
+                'department' => $user->department,
+                'position'   => $user->position ?: 'Staff',
+                'label'      => $user->name.' · '.($user->position ?: ucfirst((string) $user->role)),
+            ])
+            ->all();
+    }
+
     public function statusUpdates(): HasMany
     {
         return $this->hasMany(DocumentStatusUpdate::class, 'updated_by');

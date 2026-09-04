@@ -30,6 +30,7 @@
                             <p class="text-sm font-semibold text-slate-900">{{ item.title }}</p>
                             <p class="text-xs text-slate-500">
                                 {{ item.tracking }} &bull; {{ item.category }} &bull; Submitted by {{ item.owner }}
+                                <template v-if="item.handler"> &bull; Handling {{ item.handler }}</template>
                             </p>
                             <div class="mt-1 flex items-center gap-2">
                                 <span

@@ -215,6 +215,7 @@
                                 <p class="text-sm font-bold text-gray-900">{{ item.title }}</p>
                                 <p class="text-xs text-gray-500 mt-0.5">
                                     {{ item.tracking }} &bull; {{ item.submittedBy }}
+                                    <template v-if="item.handler"> · Handling {{ item.handler }}</template>
                                 </p>
                             </div>
                             <span class="soft-chip">{{ item.age }}</span>

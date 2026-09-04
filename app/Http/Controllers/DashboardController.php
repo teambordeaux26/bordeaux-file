@@ -8,6 +8,7 @@ use App\Models\OfficeEvent;
 use App\Models\VisitorLog;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -17,15 +18,17 @@ class DashboardController extends Controller
         $year  = now()->year;
         $month = now()->month;
 
+        $user = $request->user();
+
         $stats = [
             [
                 'label' => 'Pending Review',
-                'value' => Document::whereIn('status', ['pending', 'under_review'])->count(),
+                'value' => Document::query()->visibleTo($user)->whereIn('status', ['pending', 'under_review'])->count(),
                 'note'  => 'Awaiting admin approval.',
             ],
             [
                 'label' => 'Approved This Month',
-                'value' => Document::where('status', 'approved')
+                'value' => Document::query()->visibleTo($user)->where('status', 'approved')
                     ->whereYear('approved_at', $year)
                     ->whereMonth('approved_at', $month)
                     ->count(),
@@ -38,7 +41,8 @@ class DashboardController extends Controller
             ],
         ];
 
-        $approvals = Document::with(['category.parent', 'submitter'])
+        $approvals = Document::with(['category.parent', 'submitter', 'handler'])
+            ->visibleTo($user)
             ->whereIn('status', ['pending', 'under_review'])
             ->latest()
             ->take(5)
@@ -48,6 +52,7 @@ class DashboardController extends Controller
                 'tracking'    => $d->tracking_number,
                 'title'       => $d->title,
                 'submittedBy' => $d->submitter?->name ?? '—',
+                'handler'     => $d->handler?->name,
                 'age'         => $d->created_at->diffForHumans(),
             ]);
 
@@ -133,6 +138,7 @@ class DashboardController extends Controller
             ]);
 
         $deadlines = Document::with('category.parent')
+            ->visibleTo(Auth::user())
             ->whereNotNull('expires_at')
             ->where('status', '!=', 'archived')
             ->whereBetween('expires_at', [$from, $to])

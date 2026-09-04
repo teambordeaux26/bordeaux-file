@@ -25,7 +25,7 @@
                 eyebrow="Track a File"
                 subtitle="Search and narrow the board by category, priority, or owner."
             >
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                     <div class="lg:col-span-2">
                         <label class="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
                             Search
@@ -70,6 +70,21 @@
                                 :value="p"
                             >
                                 {{ p }}
+                            </option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+                            Currently handling
+                        </label>
+                        <select v-model="filters.handler_id" class="soft-select">
+                            <option :value="null">Anyone</option>
+                            <option
+                                v-for="h in filterOptions.handlers"
+                                :key="h.id"
+                                :value="h.id"
+                            >
+                                {{ h.name }}
                             </option>
                         </select>
                     </div>
@@ -168,10 +183,10 @@
                                 </p>
                                 <p class="mt-0.5 text-[11px] text-gray-500">
                                     Owner: <span class="font-medium text-gray-700">{{ doc.owner }}</span>
-                                    <template v-if="doc.reviewer">
-                                        &bull; Reviewer:
-                                        <span class="font-medium text-gray-700">{{ doc.reviewer }}</span>
-                                    </template>
+                                </p>
+                                <p class="mt-0.5 text-[11px] text-[#003366]">
+                                    Handling:
+                                    <span class="font-semibold">{{ doc.handler || 'Unassigned' }}</span>
                                 </p>
                                 <p class="mt-1 text-[10px] text-gray-400">
                                     Updated {{ doc.updated }}
@@ -408,6 +423,7 @@ const props = defineProps({
 const filterOptions = computed(() => ({
     categories: props.filters?.categories ?? [],
     owners: props.filters?.owners ?? [],
+    handlers: props.filters?.handlers ?? [],
     priorities: props.filters?.priorities ?? [],
 }));
 
@@ -416,6 +432,7 @@ const filters = reactive({
     category_id: null,
     priority: null,
     owner_id: null,
+    handler_id: null,
 });
 
 const hasActiveFilters = computed(
@@ -423,13 +440,15 @@ const hasActiveFilters = computed(
         !!filters.q.trim() ||
         filters.category_id !== null ||
         filters.priority !== null ||
-        filters.owner_id !== null
+        filters.owner_id !== null ||
+        filters.handler_id !== null
 );
 
 function matches(doc) {
     if (filters.category_id !== null && doc.category_id !== filters.category_id && doc.category_parent_id !== filters.category_id) return false;
     if (filters.priority !== null && doc.priority !== filters.priority) return false;
     if (filters.owner_id !== null && doc.owner_id !== filters.owner_id) return false;
+    if (filters.handler_id !== null && doc.handler_id !== filters.handler_id) return false;
     const q = filters.q.trim().toLowerCase();
     if (!q) return true;
     return [
@@ -437,6 +456,7 @@ function matches(doc) {
         doc.tracking,
         doc.reference,
         doc.owner,
+        doc.handler,
         doc.reviewer,
         doc.category,
     ]
@@ -465,6 +485,7 @@ function clearFilters() {
     filters.category_id = null;
     filters.priority = null;
     filters.owner_id = null;
+    filters.handler_id = null;
 }
 
 const processing = ref(null);
