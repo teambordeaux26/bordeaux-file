@@ -96,19 +96,19 @@
 
             <ReportPanel
                 title="Visitor Reports"
-                subtitle="Generate weekly or monthly visitor summaries."
-                :period="reportPeriod"
+                subtitle="Choose a From and To date, then generate the visitor report."
+                :period="report.period"
                 :range="reportRange"
                 :report="report"
                 export-base="/visitors/reports/export"
-                @update:period="changeReportPeriod"
+                @generate="applyReport"
             />
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { Head, router, useForm, usePage } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
@@ -124,7 +124,6 @@ const props = defineProps({
 
 const page = usePage();
 const barangays = computed(() => page.props.oasBarangays ?? []);
-const reportPeriod = ref(props.report.period ?? "monthly");
 
 const form = useForm({
     visitor_name:  '',
@@ -140,8 +139,11 @@ function submit() {
     });
 }
 
-function changeReportPeriod(period) {
-    reportPeriod.value = period;
-    router.get("/visitors", { report_period: period }, { preserveState: true, preserveScroll: true, replace: true });
+function applyReport({ period, from, to }) {
+    router.get("/visitors", {
+        report_period: period,
+        report_from: from,
+        report_to: to,
+    }, { preserveState: true, preserveScroll: true, replace: true });
 }
 </script>

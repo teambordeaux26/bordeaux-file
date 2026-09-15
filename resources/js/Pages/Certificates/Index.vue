@@ -218,12 +218,12 @@
 
             <ReportPanel
                 title="Certificate Reports"
-                subtitle="Generate weekly or monthly certificate issuance summaries."
-                :period="reportPeriod"
+                subtitle="Choose a From and To date, then generate the certificate report."
+                :period="report.period"
                 :range="reportRange"
                 :report="report"
                 export-base="/certificates/reports/export"
-                @update:period="changeReportPeriod"
+                @generate="applyReport"
             />
         </div>
     </AppLayout>
@@ -286,24 +286,27 @@ const form = useForm({
     signature: "",
 });
 
-const reportPeriod = ref(props.report.period ?? "monthly");
+function reportParams(extra = {}) {
+    return {
+        date: visitDate.value,
+        report_period: props.report.period || undefined,
+        report_from: props.report.from || undefined,
+        report_to: props.report.to || undefined,
+        ...extra,
+    };
+}
 
 function loadVisitorsForDate() {
     form.visitor_log_id = "";
-    router.get(
-        "/certificates",
-        { date: visitDate.value, report_period: reportPeriod.value },
-        { preserveState: true, replace: true }
-    );
+    router.get("/certificates", reportParams(), { preserveState: true, replace: true });
 }
 
-function changeReportPeriod(period) {
-    reportPeriod.value = period;
-    router.get(
-        "/certificates",
-        { date: visitDate.value, report_period: period },
-        { preserveState: true, preserveScroll: true, replace: true }
-    );
+function applyReport({ period, from, to }) {
+    router.get("/certificates", reportParams({
+        report_period: period,
+        report_from: from,
+        report_to: to,
+    }), { preserveState: true, preserveScroll: true, replace: true });
 }
 
 function submit() {

@@ -5,13 +5,22 @@ namespace App\Http\Controllers;
 use App\Services\SectionReportService;
 use App\Support\ReportPeriod;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 trait ExportsSectionReports
 {
-    protected function reportPeriod(?string $period): array
+    protected function reportPeriod(?string $period, ?string $from = null, ?string $to = null): array
     {
-        return ReportPeriod::resolve($period);
+        return ReportPeriod::resolve($period, $from, $to);
+    }
+
+    /**
+     * @return array{period: string, start: \Carbon\Carbon, end: \Carbon\Carbon, label: string, from: string, to: string}
+     */
+    protected function reportPeriodFrom(Request $request): array
+    {
+        return ReportPeriod::fromRequest($request);
     }
 
     protected function streamCsv(string $filename, array $headers, array $rows): StreamedResponse

@@ -9,6 +9,7 @@ use App\Models\DocumentStatusUpdate;
 use App\Models\User;
 use App\Services\DocumentRetentionService;
 use App\Support\DocumentStatus;
+use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +30,7 @@ class DocumentController extends Controller
             'q'             => 'nullable|string|max:255',
             'category_id'   => 'nullable|integer|exists:document_categories,id',
             'status'        => 'nullable|string|max:50',
-            'report_period' => 'nullable|in:weekly,monthly',
+            ...ReportPeriod::requestRules(),
         ]);
 
         $query = Document::with(['category.parent', 'submitter', 'handler', 'allowedUsers'])
@@ -70,7 +71,7 @@ class DocumentController extends Controller
             ->pluck('aggregate', 'category_id')
             ->all();
 
-        $period = $this->reportPeriod($filters['report_period'] ?? 'monthly');
+        $period = $this->reportPeriodFrom($request);
 
         return Inertia::render('Documents/Index', [
             'documents'     => $documents,
@@ -87,16 +88,13 @@ class DocumentController extends Controller
 
     public function exportReport(Request $request)
     {
-        $data = $request->validate([
-            'period' => 'nullable|in:weekly,monthly',
-            'format' => 'nullable|in:csv,pdf',
-        ]);
+        $data = $request->validate(ReportPeriod::exportRules());
 
-        $period = $this->reportPeriod($data['period'] ?? 'monthly');
+        $period = $this->reportPeriodFrom($request);
         $rows   = $this->reports()->documentRows($period['start'], $period['end']);
         $report = $this->reports()->documents($period['start'], $period['end'], $period['period']);
         $format = $data['format'] ?? 'csv';
-        $stamp  = $period['period'].'-'.now()->format('Ymd');
+        $stamp  = $period['from'].'-to-'.$period['to'];
 
         if ($format === 'pdf') {
             return $this->downloadReportPdf('pdf.reports.documents', "document-movement-{$stamp}.pdf", [

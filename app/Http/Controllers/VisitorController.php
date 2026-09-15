@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\VisitorLog;
 use App\Rules\OasBarangayAddress;
+use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -15,9 +16,7 @@ class VisitorController extends Controller
 
     public function index(Request $request)
     {
-        $filters = $request->validate([
-            'report_period' => 'nullable|in:weekly,monthly',
-        ]);
+        $request->validate(ReportPeriod::requestRules());
 
         $visitors = VisitorLog::with('recorder')
             ->whereDate('time_in', today())
@@ -33,7 +32,7 @@ class VisitorController extends Controller
                 'timeOut' => $v->time_out?->format('H:i'),
             ]);
 
-        $period = $this->reportPeriod($filters['report_period'] ?? 'monthly');
+        $period = $this->reportPeriodFrom($request);
 
         return Inertia::render('Visitors/Index', [
             'visitors'    => $visitors,
@@ -70,16 +69,13 @@ class VisitorController extends Controller
 
     public function exportReport(Request $request)
     {
-        $data = $request->validate([
-            'period' => 'nullable|in:weekly,monthly',
-            'format' => 'nullable|in:csv,pdf',
-        ]);
+        $data = $request->validate(ReportPeriod::exportRules());
 
-        $period = $this->reportPeriod($data['period'] ?? 'monthly');
+        $period = $this->reportPeriodFrom($request);
         $rows   = $this->reports()->visitorRows($period['start'], $period['end']);
         $report = $this->reports()->visitors($period['start'], $period['end'], $period['period']);
         $format = $data['format'] ?? 'csv';
-        $stamp  = $period['period'].'-'.now()->format('Ymd');
+        $stamp  = $period['from'].'-to-'.$period['to'];
 
         if ($format === 'pdf') {
             return $this->downloadReportPdf('pdf.reports.visitors', "visitor-log-{$stamp}.pdf", [

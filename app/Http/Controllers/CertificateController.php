@@ -7,6 +7,7 @@ use App\Models\Certificate;
 use App\Models\VisitorLog;
 use App\Services\CertificatePdfService;
 use App\Services\CertificateSignatureService;
+use App\Support\ReportPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -20,12 +21,12 @@ class CertificateController extends Controller
     public function index(Request $request, CertificateSignatureService $signatures)
     {
         $selectedDate = $request->validate([
-            'date'          => 'nullable|date',
-            'report_period' => 'nullable|in:weekly,monthly',
+            'date' => 'nullable|date',
+            ...ReportPeriod::requestRules(),
         ]);
 
         $selectedDate = $selectedDate['date'] ?? today()->toDateString();
-        $period       = $this->reportPeriod($request->query('report_period', 'monthly'));
+        $period       = $this->reportPeriodFrom($request);
 
         $certificates = Certificate::with(['visitorLog', 'issuer'])
             ->latest()
@@ -64,16 +65,13 @@ class CertificateController extends Controller
 
     public function exportReport(Request $request)
     {
-        $data = $request->validate([
-            'period' => 'nullable|in:weekly,monthly',
-            'format' => 'nullable|in:csv,pdf',
-        ]);
+        $data = $request->validate(ReportPeriod::exportRules());
 
-        $period = $this->reportPeriod($data['period'] ?? 'monthly');
+        $period = $this->reportPeriodFrom($request);
         $rows   = $this->reports()->certificateRows($period['start'], $period['end']);
         $report = $this->reports()->certificates($period['start'], $period['end'], $period['period']);
         $format = $data['format'] ?? 'csv';
-        $stamp  = $period['period'].'-'.now()->format('Ymd');
+        $stamp  = $period['from'].'-to-'.$period['to'];
 
         if ($format === 'pdf') {
             return $this->downloadReportPdf('pdf.reports.certificates', "certificates-{$stamp}.pdf", [

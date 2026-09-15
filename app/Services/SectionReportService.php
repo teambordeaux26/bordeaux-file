@@ -38,7 +38,9 @@ class SectionReportService
 
         return [
             'period'    => $period,
-            'label'     => $period === 'weekly' ? 'Weekly document movement' : 'Monthly document movement',
+            'from'      => $start->toDateString(),
+            'to'        => $end->toDateString(),
+            'label'     => $this->periodTitle($period, 'document movement'),
             'stats'     => [
                 ['label' => 'Submitted',   'value' => $submitted],
                 ['label' => 'Approved',    'value' => $approved],
@@ -133,7 +135,9 @@ class SectionReportService
 
         return [
             'period'    => $period,
-            'label'     => $period === 'weekly' ? 'Weekly visitor summary' : 'Monthly visitor summary',
+            'from'      => $start->toDateString(),
+            'to'        => $end->toDateString(),
+            'label'     => $this->periodTitle($period, 'visitor summary'),
             'stats'     => [
                 ['label' => 'Total visitors', 'value' => $total],
                 ['label' => 'Unique purposes', 'value' => $byPurpose->count()],
@@ -196,7 +200,9 @@ class SectionReportService
 
         return [
             'period'    => $period,
-            'label'     => $period === 'weekly' ? 'Weekly certificate issuance' : 'Monthly certificate issuance',
+            'from'      => $start->toDateString(),
+            'to'        => $end->toDateString(),
+            'label'     => $this->periodTitle($period, 'certificate issuance'),
             'stats'     => [
                 ['label' => 'Certificates issued', 'value' => $total],
             ],
@@ -231,5 +237,14 @@ class SectionReportService
                 'issuer'  => $cert->signer_name ?: ($cert->issuer?->name ?? '—'),
             ])
             ->all();
+    }
+
+    private function periodTitle(string $period, string $subject): string
+    {
+        return match ($period) {
+            'weekly' => 'Weekly '.$subject,
+            'custom' => 'Custom '.$subject,
+            default  => 'Monthly '.$subject,
+        };
     }
 }

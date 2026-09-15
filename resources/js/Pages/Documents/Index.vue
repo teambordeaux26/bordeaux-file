@@ -231,12 +231,12 @@
 
             <ReportPanel
                 title="Document Movement Overview"
-                subtitle="Generate and export processed documents by week or month."
-                :period="reportPeriod"
+                subtitle="Choose a From and To date, then generate the document movement report."
+                :period="report.period"
                 :range="reportRange"
                 :report="report"
                 export-base="/documents/reports/export"
-                @update:period="changeReportPeriod"
+                @generate="applyReport"
             />
         </div>
     </AppLayout>
@@ -276,7 +276,6 @@ const selectedParent = computed(() => {
 const search = ref(props.filters.q ?? "");
 const filterCategory = ref(props.filters.category_id ?? "");
 const filterStatus = ref(props.filters.status ?? "");
-const reportPeriod = ref(props.report.period ?? "monthly");
 
 watch(
     () => props.filters,
@@ -293,7 +292,9 @@ function currentParams(extra = {}) {
         q: search.value || undefined,
         category_id: filterCategory.value || undefined,
         status: filterStatus.value || undefined,
-        report_period: reportPeriod.value || undefined,
+        report_period: props.report.period || undefined,
+        report_from: props.report.from || undefined,
+        report_to: props.report.to || undefined,
         ...extra,
     };
 }
@@ -307,9 +308,12 @@ function selectCategory(id) {
     applyFilters();
 }
 
-function changeReportPeriod(period) {
-    reportPeriod.value = period;
-    applyFilters();
+function applyReport({ period, from, to }) {
+    router.get("/documents", currentParams({
+        report_period: period,
+        report_from: from,
+        report_to: to,
+    }), { preserveState: true, preserveScroll: true, replace: true });
 }
 
 const statusClass = (status) => {
