@@ -35,6 +35,16 @@ it('resolves this week when the period is weekly', function () {
         ->and($result['to'])->toBe(Carbon::now()->endOfWeek()->toDateString());
 });
 
+it('resolves a named previous month', function () {
+    $result = ReportPeriod::resolve('month-2026-08');
+
+    expect($result['ready'])->toBeTrue()
+        ->and($result['period'])->toBe('month-2026-08')
+        ->and($result['from'])->toBe('2026-08-01')
+        ->and($result['to'])->toBe('2026-08-31')
+        ->and($result['label'])->toBe('August 2026');
+});
+
 it('does not select a range until a period or dates are provided', function () {
     $result = ReportPeriod::resolve(null);
 

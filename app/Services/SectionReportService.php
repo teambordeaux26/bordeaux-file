@@ -6,6 +6,7 @@ use App\Models\Certificate;
 use App\Models\Document;
 use App\Models\VisitorLog;
 use App\Support\DocumentStatus;
+use App\Support\ReportPeriod;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -241,6 +242,12 @@ class SectionReportService
 
     private function periodTitle(string $period, string $subject): string
     {
+        $namedMonth = ReportPeriod::namedMonth($period);
+
+        if ($namedMonth) {
+            return $namedMonth->format('F Y').' '.$subject;
+        }
+
         return match ($period) {
             'weekly' => 'Weekly '.$subject,
             'custom' => 'Custom '.$subject,

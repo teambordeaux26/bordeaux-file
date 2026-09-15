@@ -178,6 +178,34 @@ it('does not preview a report until a date filter is set', function () {
         );
 });
 
+it('filters document reports to a previous month', function () {
+    $this->withoutVite();
+
+    $staff = reportStaff();
+
+    $inRange = Document::query()->create([
+        'tracking_number' => 'TRK-AUG',
+        'title' => 'August memo',
+        'status' => 'pending',
+        'submitted_by' => $staff->id,
+    ]);
+    $inRange->forceFill([
+        'created_at' => '2026-08-12 09:00:00',
+        'updated_at' => '2026-08-12 09:00:00',
+    ])->saveQuietly();
+
+    $this->actingAs($staff)
+        ->get('/documents?report_period=month-2026-08')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Documents/Index')
+            ->where('report.period', 'month-2026-08')
+            ->where('report.from', '2026-08-01')
+            ->where('report.to', '2026-08-31')
+            ->where('report.stats.0.value', 1)
+        );
+});
+
 it('requires from and to dates when generating a custom report', function () {
     $staff = reportStaff();
 

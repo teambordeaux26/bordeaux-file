@@ -12,6 +12,15 @@
                         <option value="">Select period</option>
                         <option value="weekly">This week</option>
                         <option value="monthly">This month</option>
+                        <optgroup v-if="previousMonths.length" label="Previous months">
+                            <option
+                                v-for="month in previousMonths"
+                                :key="month.value"
+                                :value="month.value"
+                            >
+                                {{ month.label }}
+                            </option>
+                        </optgroup>
                         <option value="custom">Custom dates</option>
                     </select>
                 </div>
@@ -94,6 +103,34 @@ const appliedFrom = computed(() => props.report.from || "");
 const appliedTo = computed(() => props.report.to || "");
 const appliedLabel = computed(() => props.report.label || props.range || "");
 
+const previousMonths = computed(() => {
+    const months = [];
+    const today = new Date();
+
+    for (let offset = 1; offset <= 12; offset += 1) {
+        const date = new Date(today.getFullYear(), today.getMonth() - offset, 1);
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+
+        months.push({
+            value: `month-${date.getFullYear()}-${month}`,
+            label: date.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+        });
+    }
+
+    const selected = appliedPeriod.value;
+    const named = selected.match(/^month-(\d{4})-(\d{2})$/);
+
+    if (named && !months.some((month) => month.value === selected)) {
+        const date = new Date(Number(named[1]), Number(named[2]) - 1, 1);
+        months.unshift({
+            value: selected,
+            label: date.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
+        });
+    }
+
+    return months;
+});
+
 const dateError = computed(() => {
     if (draft.from && draft.to && draft.from > draft.to) {
         return "The From date must be on or before the To date.";
@@ -156,6 +193,18 @@ function applyPresetDates(period) {
         const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         draft.from = toIsoDate(start);
         draft.to = toIsoDate(end);
+        return;
+    }
+
+    const namedMonth = period.match(/^month-(\d{4})-(\d{2})$/);
+
+    if (namedMonth) {
+        const year = Number(namedMonth[1]);
+        const monthIndex = Number(namedMonth[2]) - 1;
+        const start = new Date(year, monthIndex, 1);
+        const end = new Date(year, monthIndex + 1, 0);
+        draft.from = toIsoDate(start);
+        draft.to = toIsoDate(end);
     }
 }
 
@@ -178,7 +227,7 @@ function applyFilter() {
 }
 
 function onPeriodChange() {
-    if (draft.period === "weekly" || draft.period === "monthly") {
+    if (draft.period === "weekly" || draft.period === "monthly" || /^month-\d{4}-\d{2}$/.test(draft.period)) {
         applyPresetDates(draft.period);
         applyFilter();
         return;
@@ -195,7 +244,7 @@ function onPeriodChange() {
 }
 
 function onDateChange() {
-    draft.period = draft.period || "custom";
+    draft.period = "custom";
     applyFilter();
 }
 
