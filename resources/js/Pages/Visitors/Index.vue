@@ -96,7 +96,7 @@
 
             <ReportPanel
                 title="Visitor Reports"
-                subtitle="Choose a From and To date, then generate the visitor report."
+                subtitle="Set the date filter first, then export the visitor report."
                 :period="report.period"
                 :range="reportRange"
                 :report="report"

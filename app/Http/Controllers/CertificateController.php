@@ -53,11 +53,15 @@ class CertificateController extends Controller
                 'time_in' => $v->time_in?->format('g:i A') ?? '—',
             ]);
 
+        $report = $period['ready']
+            ? $this->reports()->certificates($period['start'], $period['end'], $period['period'])
+            : $this->emptyReport();
+
         return Inertia::render('Certificates/Index', [
             'certificates' => $certificates,
             'visitors'     => $visitors,
             'selectedDate' => $selectedDate,
-            'report'       => $this->reports()->certificates($period['start'], $period['end'], $period['period']),
+            'report'       => $report,
             'reportRange'  => $period['label'],
             'signer'       => $signatures->payloadForUser(Auth::user()),
         ]);

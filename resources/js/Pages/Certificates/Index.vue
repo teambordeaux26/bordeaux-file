@@ -218,7 +218,7 @@
 
             <ReportPanel
                 title="Certificate Reports"
-                subtitle="Choose a From and To date, then generate the certificate report."
+                subtitle="Set the date filter first, then export the certificate report."
                 :period="report.period"
                 :range="reportRange"
                 :report="report"

@@ -231,7 +231,7 @@
 
             <ReportPanel
                 title="Document Movement Overview"
-                subtitle="Choose a From and To date, then generate the document movement report."
+                subtitle="Set the date filter first, then export the document movement report."
                 :period="report.period"
                 :range="reportRange"
                 :report="report"

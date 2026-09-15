@@ -72,6 +72,9 @@ class DocumentController extends Controller
             ->all();
 
         $period = $this->reportPeriodFrom($request);
+        $report = $period['ready']
+            ? $this->reports()->documents($period['start'], $period['end'], $period['period'])
+            : $this->emptyReport();
 
         return Inertia::render('Documents/Index', [
             'documents'     => $documents,
@@ -81,7 +84,7 @@ class DocumentController extends Controller
                 'category_id' => $filters['category_id'] ?? '',
                 'status'      => $filters['status'] ?? '',
             ],
-            'report'        => $this->reports()->documents($period['start'], $period['end'], $period['period']),
+            'report'        => $report,
             'reportRange'   => $period['label'],
         ]);
     }

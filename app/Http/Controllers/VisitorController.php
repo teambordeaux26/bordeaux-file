@@ -33,10 +33,13 @@ class VisitorController extends Controller
             ]);
 
         $period = $this->reportPeriodFrom($request);
+        $report = $period['ready']
+            ? $this->reports()->visitors($period['start'], $period['end'], $period['period'])
+            : $this->emptyReport();
 
         return Inertia::render('Visitors/Index', [
             'visitors'    => $visitors,
-            'report'      => $this->reports()->visitors($period['start'], $period['end'], $period['period']),
+            'report'      => $report,
             'reportRange' => $period['label'],
         ]);
     }

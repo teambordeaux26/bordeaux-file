@@ -35,12 +35,11 @@ it('resolves this week when the period is weekly', function () {
         ->and($result['to'])->toBe(Carbon::now()->endOfWeek()->toDateString());
 });
 
-it('defaults to this month', function () {
-    Carbon::setTestNow(Carbon::parse('2026-03-11 10:00:00'));
-
+it('does not select a range until a period or dates are provided', function () {
     $result = ReportPeriod::resolve(null);
 
-    expect($result['period'])->toBe('monthly')
-        ->and($result['from'])->toBe('2026-03-01')
-        ->and($result['to'])->toBe('2026-03-31');
+    expect($result['ready'])->toBeFalse()
+        ->and($result['period'])->toBe('')
+        ->and($result['from'])->toBe('')
+        ->and($result['to'])->toBe('');
 });

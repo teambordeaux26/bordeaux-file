@@ -164,6 +164,20 @@ it('filters certificate reports to a custom from and to date', function () {
         ->and($content)->not->toContain('CERT-OUT');
 });
 
+it('does not preview a report until a date filter is set', function () {
+    $this->withoutVite();
+
+    $this->actingAs(reportStaff())
+        ->get('/documents')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Documents/Index')
+            ->where('report.from', '')
+            ->where('report.to', '')
+            ->where('report.stats', [])
+        );
+});
+
 it('requires from and to dates when generating a custom report', function () {
     $staff = reportStaff();
 
