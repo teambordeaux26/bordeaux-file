@@ -18,7 +18,7 @@
                 subtitle="Completed files stored for long-term retention."
             >
                 <div
-                    v-if="!archives.total"
+                    v-if="!totalArchives"
                     class="rounded border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center"
                 >
                     <p class="text-sm font-semibold text-gray-700">No archived documents yet</p>
@@ -32,6 +32,63 @@
                 </div>
 
                 <div v-else>
+                    <div class="mb-4 flex flex-wrap items-center gap-3">
+                        <input
+                            v-model="search"
+                            class="soft-input !w-auto min-w-[12rem] flex-1 max-w-xs"
+                            placeholder="Search title, tracking, or owner"
+                        />
+                        <select
+                            v-model="filterCategory"
+                            class="soft-select !w-64 shrink-0"
+                            @change="applyFilters"
+                        >
+                            <option value="">All categories</option>
+                            <template v-for="cat in categoryTree" :key="cat.id">
+                                <option :value="String(cat.id)">{{ cat.name }}</option>
+                                <option
+                                    v-for="child in cat.children"
+                                    :key="child.id"
+                                    :value="String(child.id)"
+                                >
+                                    — {{ child.name }}
+                                </option>
+                            </template>
+                        </select>
+                        <select
+                            v-model="filterRetention"
+                            class="soft-select !w-40 shrink-0"
+                            @change="applyFilters"
+                        >
+                            <option value="">All retention</option>
+                            <option
+                                v-for="option in retentionOptions"
+                                :key="option.value"
+                                :value="String(option.value)"
+                            >
+                                {{ option.label }}
+                            </option>
+                        </select>
+                        <select
+                            v-model="filterYear"
+                            class="soft-select !w-36 shrink-0"
+                            @change="applyFilters"
+                        >
+                            <option value="">All years</option>
+                            <option v-for="year in years" :key="year" :value="String(year)">
+                                {{ year }}
+                            </option>
+                        </select>
+                        <button
+                            v-if="hasFilters"
+                            type="button"
+                            class="text-xs font-semibold text-gray-500 hover:text-[#003366]"
+                            @click="clearFilters"
+                        >
+                            Clear
+                        </button>
+                    </div>
+
                     <div class="overflow-x-auto border border-gray-300">
                         <table class="w-full text-left text-sm">
                             <thead class="bg-[#003366] text-[10px] uppercase tracking-widest text-white">
@@ -45,6 +102,11 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr v-if="rows.length === 0">
+                                    <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400">
+                                        No archived documents match these filters.
+                                    </td>
+                                </tr>
                                 <tr v-for="item in rows" :key="item.id" class="hover:bg-blue-50/40 transition">
                                     <td class="px-4 py-3 font-bold text-[#003366] whitespace-nowrap">
                                         {{ item.tracking }}
@@ -101,7 +163,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { Head, Link, router, usePage } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
@@ -110,9 +172,65 @@ import Pagination from "../../Components/Pagination.vue";
 
 const props = defineProps({
     archives: { type: Object, default: () => ({ data: [], total: 0 }) },
+    totalArchives: { type: Number, default: 0 },
+    categoryTree: { type: Array, default: () => [] },
+    retentionOptions: { type: Array, default: () => [] },
+    years: { type: Array, default: () => [] },
+    filters: {
+        type: Object,
+        default: () => ({ q: "", category_id: "", retention_days: "", year: "" }),
+    },
 });
 
 const rows = computed(() => props.archives?.data ?? []);
+const search = ref(props.filters.q ?? "");
+const filterCategory = ref(props.filters.category_id ?? "");
+const filterRetention = ref(props.filters.retention_days ?? "");
+const filterYear = ref(props.filters.year ?? "");
+
+const hasFilters = computed(() =>
+    Boolean(search.value || filterCategory.value || filterRetention.value || filterYear.value)
+);
+
+watch(
+    () => props.filters,
+    (value) => {
+        search.value = value?.q ?? "";
+        filterCategory.value = value?.category_id ?? "";
+        filterRetention.value = value?.retention_days ?? "";
+        filterYear.value = value?.year ?? "";
+    },
+    { deep: true },
+);
+
+let searchTimer = null;
+
+watch(search, (value) => {
+    if ((value ?? "") === (props.filters.q ?? "")) return;
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilters, 300);
+});
+
+onBeforeUnmount(() => {
+    if (searchTimer) clearTimeout(searchTimer);
+});
+
+function applyFilters() {
+    router.get("/archive", {
+        q: search.value || undefined,
+        category_id: filterCategory.value || undefined,
+        retention_days: filterRetention.value || undefined,
+        year: filterYear.value || undefined,
+    }, { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function clearFilters() {
+    search.value = "";
+    filterCategory.value = "";
+    filterRetention.value = "";
+    filterYear.value = "";
+    applyFilters();
+}
 
 const page = usePage();
 const isAdmin = computed(() => page.props.auth?.user?.role === "admin");
