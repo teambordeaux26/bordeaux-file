@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AuthController extends Controller
@@ -59,11 +60,31 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $user = $request->user();
+
         Auth::logout();
+
+        if ($user) {
+            $user->forceFill(['remember_token' => null])->save();
+
+            AuditLog::create([
+                'user_id'     => $user->id,
+                'action'      => 'Logout',
+                'description' => "{$user->name} logged out. The session was ended.",
+                'ip_address'  => $request->ip(),
+            ]);
+        }
+
+        if ($user && config('session.driver') === 'database') {
+            DB::table(config('session.table', 'sessions'))
+                ->where('user_id', $user->id)
+                ->delete();
+        }
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        $request->session()->flash('success', 'You have been logged out. Your session has ended.');
 
-        return redirect('/');
+        return Inertia::location(route('login'));
     }
 }

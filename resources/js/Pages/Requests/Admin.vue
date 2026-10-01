@@ -5,8 +5,10 @@
 
             <PageHeader
                 title="Request Reviews"
-                kicker="Administration"
-                subtitle="Review, process, and update the status of citizen document requests."
+                :kicker="canManage ? 'Administration' : 'Operations'"
+                :subtitle="canManage
+                    ? 'Review, process, and update the status of citizen document requests.'
+                    : 'Incoming citizen document requests. An administrator updates the status.'"
             >
                 <template #actions>
                     <span class="soft-chip">{{ requests.length }} Total</span>
@@ -74,6 +76,9 @@
                             <div class="flex flex-wrap gap-3 mt-1 text-xs text-slate-400">
                                 <span v-if="req.email !== '—'">{{ req.email }}</span>
                                 <span v-if="req.phone !== '—'">{{ req.phone }}</span>
+                                <span v-if="req.attachments?.length" class="font-semibold text-[#003366]">
+                                    {{ req.attachments.length }} {{ req.attachments.length === 1 ? "file" : "files" }} attached
+                                </span>
                             </div>
                         </div>
 
@@ -88,7 +93,7 @@
                             </button>
 
                             <!-- pending actions -->
-                            <template v-if="req.status === 'pending'">
+                            <template v-if="canManage && req.status === 'pending'">
                                 <button
                                     class="soft-button px-3 py-1.5 text-xs"
                                     :disabled="processing === req.id + '-under_review'"
@@ -106,7 +111,7 @@
                             </template>
 
                             <!-- under_review actions -->
-                            <template v-else-if="req.status === 'under_review'">
+                            <template v-else-if="canManage && req.status === 'under_review'">
                                 <button
                                     class="soft-button px-3 py-1.5 text-xs"
                                     @click="openCompleteModal(req)"
@@ -123,7 +128,7 @@
                             </template>
 
                             <!-- completed / rejected — reopen -->
-                            <template v-else>
+                            <template v-else-if="canManage">
                                 <button
                                     class="soft-button-light px-3 py-1.5 text-xs"
                                     :disabled="processing === req.id + '-under_review'"
@@ -144,6 +149,19 @@
                             <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1">Request Details</p>
                             <p v-if="req.details" class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{{ req.details }}</p>
                             <p v-else class="text-sm text-gray-400 italic">No additional details provided.</p>
+                            <div v-if="req.attachments?.length" class="mt-3">
+                                <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1">Attached Files</p>
+                                <ul class="space-y-1">
+                                    <li v-for="file in req.attachments" :key="file.id">
+                                        <a
+                                            :href="file.url"
+                                            class="text-sm font-semibold text-[#003366] underline"
+                                        >
+                                            {{ file.name || 'Download file' }}
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </Transition>
                 </div>
@@ -261,8 +279,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
-import { Head, router, useForm } from "@inertiajs/vue3";
+import { ref, computed, watch } from "vue";
+import { Head, router, useForm, usePage } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SignaturePad from "../../Components/SignaturePad.vue";
@@ -280,6 +298,14 @@ const props = defineProps({
     },
 });
 
+const page = usePage();
+const canManage = computed(() => page.props.auth?.user?.role === "admin");
+
+function tabFromUrl(url) {
+    const status = new URLSearchParams((url || "").split("?")[1] ?? "").get("status");
+    return ["pending", "under_review", "completed", "rejected"].includes(status) ? status : "all";
+}
+
 const tabs = [
     { label: 'All',          value: 'all' },
     { label: 'Pending',      value: 'pending' },
@@ -288,7 +314,11 @@ const tabs = [
     { label: 'Disapproved',  value: 'rejected' },
 ];
 
-const activeTab  = ref('all');
+const activeTab  = ref(tabFromUrl(page.url));
+
+watch(() => page.url, (url) => {
+    activeTab.value = tabFromUrl(url);
+});
 const expandedId = ref(null);
 const processing = ref(null);
 const completeTarget = ref(null);

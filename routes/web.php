@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PublicDocumentController;
 use App\Http\Controllers\RequestController;
 use App\Http\Controllers\SearchController;
@@ -28,11 +29,28 @@ Route::get('/', function () {
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 
+Route::get('/forgot-password', [PasswordResetController::class, 'create'])->name('password.request');
+Route::post('/forgot-password', [PasswordResetController::class, 'store'])
+    ->middleware('throttle:6,1')
+    ->name('password.email');
+Route::get('/forgot-password/verify', [PasswordResetController::class, 'verifyForm'])->name('password.otp');
+Route::post('/forgot-password/verify', [PasswordResetController::class, 'verify'])
+    ->middleware('throttle:10,1')
+    ->name('password.otp.check');
+Route::get('/forgot-password/reset', [PasswordResetController::class, 'resetForm'])->name('password.reset.form');
+Route::post('/forgot-password/reset', [PasswordResetController::class, 'reset'])
+    ->middleware('throttle:6,1')
+    ->name('password.update');
+
 Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
 Route::middleware(['auth', 'role:admin,employee'])->group(function () {
+    Route::get('/requests/notifications', [RequestController::class, 'notifications'])->name('requests.notifications');
+    Route::get('/requests', [RequestController::class, 'adminIndex'])->name('requests.index');
+    Route::get('/requests/{documentRequest}/attachments/{attachment}', [RequestController::class, 'downloadAttachment'])->name('requests.attachment');
+
     Route::get('/account', [AccountController::class, 'show'])->name('account.show');
     Route::put('/account/password', [AccountController::class, 'updatePassword'])->name('account.password');
     Route::put('/account/signature', [AccountController::class, 'updateSignature'])->name('account.signature');
@@ -97,7 +115,6 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::put('/approvals/{document}/reject',           [ApprovalsController::class, 'reject'])->name('approvals.reject');
 
     // Request Reviews
-    Route::get('/requests',                              [RequestController::class, 'adminIndex'])->name('requests.index');
     Route::put('/requests/{documentRequest}/status',     [RequestController::class, 'adminUpdateStatus'])->name('requests.update-status');
     Route::post('/requests/{documentRequest}/complete', [RequestController::class, 'adminComplete'])->name('requests.complete');
 

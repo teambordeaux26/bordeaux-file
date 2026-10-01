@@ -23,6 +23,14 @@ createInertiaApp({
         // Initial page load (full refresh / first visit with a flash).
         showFlash(props.initialPage?.props?.flash);
 
+        // A page restored from the back button must be loaded again so a
+        // logged-out session cannot keep showing the office portal.
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+
         createApp({
             render: () => [
                 h(App, props),

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DocumentRequest extends Model
 {
@@ -47,6 +48,11 @@ class DocumentRequest extends Model
     public function certificate(): BelongsTo
     {
         return $this->belongsTo(Certificate::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(DocumentRequestAttachment::class);
     }
 
     public function issuesCertificate(): bool

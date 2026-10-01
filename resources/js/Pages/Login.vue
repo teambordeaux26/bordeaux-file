@@ -1,7 +1,7 @@
 <template>
     <Head title="Login" />
-    <div class="min-h-screen bg-[#f5f5f5] text-gray-900 font-sans flex flex-col overflow-x-hidden">
-
+    <div class="flex h-dvh flex-col overflow-hidden bg-[#f5f5f5] text-gray-900 font-sans">
+        <div class="relative z-50 shrink-0">
         <!-- Top Government Banner -->
         <div class="anim-1 bg-[#003366] text-white text-[9px] sm:text-xs py-1.5 sm:py-1 text-center tracking-wide sm:tracking-widest uppercase leading-snug sm:leading-relaxed px-3 sm:px-4">
             Republic of the Philippines
@@ -22,7 +22,9 @@
                 </div>
             </div>
         </header>
+        </div>
 
+        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain">
         <!-- Page Body -->
         <div class="flex-1 flex flex-col items-center justify-start lg:justify-center px-3 sm:px-6 py-6 sm:py-12">
             <div class="w-full max-w-5xl">
@@ -93,6 +95,12 @@
                                 </p>
                             </div>
 
+                            <div class="flex justify-end -mt-1">
+                                <Link href="/forgot-password" class="text-xs font-semibold text-[#003366] hover:underline">
+                                    Forgot password?
+                                </Link>
+                            </div>
+
                             <label class="flex items-center gap-2.5 text-sm sm:text-xs text-gray-600 cursor-pointer min-h-[44px] sm:min-h-0">
                                 <input
                                     v-model="form.remember"
@@ -158,6 +166,7 @@
                 </div>
             </div>
         </footer>
+        </div>
 
     </div>
 </template>

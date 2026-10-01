@@ -27,7 +27,8 @@ class UserController extends Controller
             $q = $filters['q'];
             $query->where(function ($builder) use ($q) {
                 $builder->where('name', 'like', "%{$q}%")
-                    ->orWhere('email', 'like', "%{$q}%");
+                    ->orWhere('email', 'like', "%{$q}%")
+                    ->orWhere('contact_email', 'like', "%{$q}%");
             });
         }
 
@@ -48,8 +49,9 @@ class UserController extends Controller
                     'role_label'   => ucfirst($u->role ?? 'employee'),
                     'department'   => $u->department ?? '',
                     'position'     => $u->position ?? '',
-                    'phone'        => $u->phone ?? '',
-                    'status'       => $u->status ?? 'active',
+                    'phone'         => $u->phone ?? '',
+                    'contact_email' => $u->contact_email ?? '',
+                    'status'        => $u->status ?? 'active',
                     'status_label' => ucfirst($u->status ?? 'active'),
                     'lastLogin'    => $u->last_login_at?->diffForHumans() ?? 'Never',
                 ];
@@ -85,9 +87,10 @@ class UserController extends Controller
             'role'         => ['required', Rule::in(['admin', 'employee'])],
             'department'   => 'nullable|string|max:120',
             'position'     => 'nullable|string|max:120',
-            'phone'        => 'nullable|string|max:30',
-            'status'       => ['required', Rule::in(['active', 'inactive'])],
-            'password'     => 'required|string|min:8|confirmed',
+            'phone'         => 'nullable|string|max:30',
+            'contact_email' => 'required|email|max:255',
+            'status'        => ['required', Rule::in(['active', 'inactive'])],
+            'password'      => 'required|string|min:8|confirmed',
         ], [
             'email_local.regex' => 'Email may only contain letters, numbers, dots, dashes, or underscores.',
         ]);
@@ -105,10 +108,11 @@ class UserController extends Controller
             'email'      => $email,
             'password'   => Hash::make($data['password']),
             'role'       => $data['role'],
-            'department' => $data['department'] ?: null,
-            'position'   => $data['position'] ?: null,
-            'phone'      => $data['phone'] ?: null,
-            'status'     => $data['status'],
+            'department' => ($data['department'] ?? null) ?: null,
+            'position'   => ($data['position'] ?? null) ?: null,
+            'phone'         => ($data['phone'] ?? null) ?: null,
+            'contact_email' => $data['contact_email'],
+            'status'        => $data['status'],
         ]);
 
         AuditLog::create([
@@ -136,9 +140,10 @@ class UserController extends Controller
             'role'         => ['required', Rule::in(['admin', 'employee'])],
             'department'   => 'nullable|string|max:120',
             'position'     => 'nullable|string|max:120',
-            'phone'        => 'nullable|string|max:30',
-            'status'       => ['required', Rule::in(['active', 'inactive'])],
-            'password'     => 'nullable|string|min:8|confirmed',
+            'phone'         => 'nullable|string|max:30',
+            'contact_email' => 'required|email|max:255',
+            'status'        => ['required', Rule::in(['active', 'inactive'])],
+            'password'      => 'nullable|string|min:8|confirmed',
         ], [
             'email_local.regex' => 'Email may only contain letters, numbers, dots, dashes, or underscores.',
         ]);
@@ -169,10 +174,11 @@ class UserController extends Controller
             'name'       => $data['name'],
             'email'      => $email,
             'role'       => $data['role'],
-            'department' => $data['department'] ?: null,
-            'position'   => $data['position'] ?: null,
-            'phone'      => $data['phone'] ?: null,
-            'status'     => $data['status'],
+            'department' => ($data['department'] ?? null) ?: null,
+            'position'   => ($data['position'] ?? null) ?: null,
+            'phone'         => ($data['phone'] ?? null) ?: null,
+            'contact_email' => $data['contact_email'],
+            'status'        => $data['status'],
         ]);
 
         if (! empty($data['password'])) {

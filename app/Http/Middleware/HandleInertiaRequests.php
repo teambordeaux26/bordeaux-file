@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Document;
 use App\Models\SystemSetting;
 use App\Support\OasBarangays;
+use App\Support\RequestNotifications;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -33,12 +34,9 @@ class HandleInertiaRequests extends Middleware
         $response = parent::handle($request, $next);
 
         $response->headers->set('Vary', Header::INERTIA.', Accept');
-
-        if ($request->header(Header::INERTIA)) {
-            $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
-            $response->headers->set('Pragma', 'no-cache');
-            $response->headers->set('Expires', '0');
-        }
+        $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Expires', '0');
 
         return $response;
     }
@@ -83,6 +81,7 @@ class HandleInertiaRequests extends Middleware
                 : null,
             'oasBarangays' => fn () => OasBarangays::options(),
             'returnedCount' => fn () => $this->returnedCountFor($request),
+            'requestNotifications' => fn () => RequestNotifications::forUser($request->user()),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),

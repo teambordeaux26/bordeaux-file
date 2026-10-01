@@ -115,6 +115,69 @@
 
             <!-- Right: user info + logout -->
             <div class="flex flex-wrap items-center gap-3 sm:gap-4 shrink-0">
+            <!-- Incoming citizen requests -->
+            <div ref="noticeWrap" class="relative shrink-0">
+                <button
+                    type="button"
+                    class="relative inline-flex h-9 w-9 items-center justify-center border border-gray-300 text-[#003366] hover:bg-gray-50 transition"
+                    :aria-label="incoming.count ? `${incoming.count} incoming document requests` : 'No incoming document requests'"
+                    :aria-expanded="noticesOpen"
+                    title="Incoming document requests"
+                    @click="toggleNotices"
+                >
+                    <Bell class="h-5 w-5" :stroke-width="2" />
+                    <span
+                        v-if="incoming.count > 0"
+                        class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center bg-[#FFD700] px-1 text-[10px] font-bold leading-none text-[#003366]"
+                    >
+                        {{ incoming.count > 9 ? "9+" : incoming.count }}
+                    </span>
+                </button>
+
+                <div
+                    v-if="noticesOpen"
+                    class="absolute right-0 top-full z-50 mt-1 w-[min(22rem,calc(100vw-2rem))] border border-gray-300 bg-white shadow-lg"
+                >
+                    <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                            Incoming requests
+                        </p>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-[#003366]">
+                            {{ incoming.count }} pending
+                        </span>
+                    </div>
+
+                    <p v-if="incoming.items.length === 0" class="px-4 py-4 text-xs text-gray-500">
+                        No incoming document requests.
+                    </p>
+
+                    <div v-else class="max-h-80 overflow-y-auto">
+                        <Link
+                            v-for="item in incoming.items"
+                            :key="item.id"
+                            href="/requests?status=pending"
+                            class="block border-b border-gray-100 px-4 py-2.5 hover:bg-gray-50 last:border-b-0"
+                            @click="noticesOpen = false"
+                        >
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-mono text-[11px] font-bold text-[#003366]">{{ item.tracking }}</span>
+                                <span class="shrink-0 text-[10px] text-gray-400">{{ item.submitted }}</span>
+                            </div>
+                            <p class="truncate text-sm font-semibold text-gray-900">{{ item.name }}</p>
+                            <p class="truncate text-xs text-gray-500">{{ item.type }}</p>
+                        </Link>
+                    </div>
+
+                    <Link
+                        href="/requests?status=pending"
+                        class="block border-t border-gray-200 px-4 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-[#003366] hover:bg-gray-50"
+                        @click="noticesOpen = false"
+                    >
+                        Open request reviews
+                    </Link>
+                </div>
+            </div>
+
                 <div class="text-right">
                     <p class="text-sm font-bold text-[#003366]">
                         {{ user?.name ?? "Guest User" }}
@@ -129,27 +192,79 @@
                 >
                     Account
                 </Link>
-                <Link
-                    href="/logout"
-                    method="post"
-                    as="button"
+                <button
+                    type="button"
                     class="border border-gray-400 px-4 py-1.5 text-xs font-semibold text-gray-600 hover:border-red-500 hover:text-red-600 transition"
+                    @click="confirmLogout = true"
                 >
                     Logout
-                </Link>
+                </button>
             </div>
         </div>
+
+        <Teleport to="body">
+            <div
+                v-if="confirmLogout"
+                class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+                @click.self="closeLogout"
+            >
+                <div
+                    class="w-full max-w-md bg-white border border-gray-300 border-t-4 border-t-[#003366] shadow-lg"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="logout-title"
+                >
+                    <div class="border-b border-gray-200 px-5 py-4">
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">Session</p>
+                        <h3 id="logout-title" class="text-lg font-bold text-[#003366]">Log out of this account?</h3>
+                        <p class="mt-1 text-sm text-gray-600">
+                            You will leave the office portal and need to sign in again to continue.
+                        </p>
+                    </div>
+                    <div class="flex justify-end gap-2 px-5 py-3">
+                        <button
+                            type="button"
+                            class="border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                            :disabled="loggingOut"
+                            @click="closeLogout"
+                        >
+                            Stay signed in
+                        </button>
+                        <button
+                            type="button"
+                            class="bg-red-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-800 disabled:opacity-60"
+                            :disabled="loggingOut"
+                            @click="logout"
+                        >
+                            {{ loggingOut ? "Logging out…" : "Log out" }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </header>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Link, router, usePage } from "@inertiajs/vue3";
-import { PanelLeft, PanelLeftClose, Search, X } from "@lucide/vue";
+import { Bell, PanelLeft, PanelLeftClose, Search, X } from "@lucide/vue";
+import { useRequestNotifications } from "../composables/useRequestNotifications.js";
 import { useSidebar } from "../composables/useSidebar.js";
 
 const page = usePage();
 const { collapsed, toggle } = useSidebar();
+const { incoming, refresh: refreshNotices } = useRequestNotifications({ poll: true });
+const noticeWrap = ref(null);
+const noticesOpen = ref(false);
+
+async function toggleNotices() {
+    noticesOpen.value = !noticesOpen.value;
+    if (noticesOpen.value) {
+        closeDropdown();
+        await refreshNotices();
+    }
+}
 
 const user = computed(() => page.props.auth?.user);
 const role = computed(() => user.value?.role ?? "guest");
@@ -168,6 +283,29 @@ const roleLabel = computed(() => {
     if (role.value === "employee") return "Employee";
     return "Guest";
 });
+
+const confirmLogout = ref(false);
+const loggingOut = ref(false);
+
+function closeLogout() {
+    if (loggingOut.value) return;
+    confirmLogout.value = false;
+}
+
+function logout() {
+    loggingOut.value = true;
+    router.post("/logout", {}, {
+        onFinish: () => {
+            loggingOut.value = false;
+        },
+    });
+}
+
+function onEscape(event) {
+    if (event.key !== "Escape") return;
+    noticesOpen.value = false;
+    if (confirmLogout.value) closeLogout();
+}
 
 const searchWrap = ref(null);
 const query = ref("");
@@ -251,18 +389,22 @@ watch(query, (value) => {
 });
 
 function onDocClick(e) {
-    if (!searchWrap.value) return;
-    if (!searchWrap.value.contains(e.target)) {
+    if (searchWrap.value && !searchWrap.value.contains(e.target)) {
         closeDropdown();
+    }
+    if (noticeWrap.value && !noticeWrap.value.contains(e.target)) {
+        noticesOpen.value = false;
     }
 }
 
 onMounted(() => {
     document.addEventListener("mousedown", onDocClick);
+    window.addEventListener("keydown", onEscape);
 });
 
 onBeforeUnmount(() => {
     document.removeEventListener("mousedown", onDocClick);
+    window.removeEventListener("keydown", onEscape);
     if (debounceTimer) clearTimeout(debounceTimer);
     if (abortController) abortController.abort();
 });

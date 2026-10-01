@@ -1,6 +1,7 @@
 <template>
     <Head title="Welcome" />
-    <div class="min-h-screen bg-[#f5f5f5] text-gray-900 font-sans">
+    <div class="flex h-dvh flex-col overflow-hidden bg-[#f5f5f5] text-gray-900 font-sans">
+        <div class="relative z-50 shrink-0">
         <!-- Top Government Banner -->
         <div
             class="fade-in bg-[#003366] text-white text-[10px] sm:text-xs py-1 text-center tracking-widest uppercase leading-relaxed px-4"
@@ -12,6 +13,7 @@
 
         <!-- Header -->
         <header
+            ref="headerEl"
             class="fade-in relative z-50 bg-white border-b-4 border-[#FFD700] shadow-md"
             style="--delay: 120ms"
         >
@@ -80,7 +82,7 @@
 
                 <!-- Mobile Hamburger -->
                 <button
-                    @click="menuOpen = !menuOpen"
+                    @click="toggleMenu"
                     class="md:hidden flex flex-col justify-center items-center gap-1.5 p-2 border border-[#003366] text-[#003366]"
                     aria-label="Toggle menu"
                 >
@@ -102,7 +104,8 @@
             <!-- Mobile Menu Dropdown -->
             <div
                 v-if="menuOpen"
-                class="md:hidden absolute left-0 right-0 top-full z-50 border-t border-gray-200 bg-white shadow-lg"
+                class="md:hidden fixed left-0 right-0 z-50 border-t border-gray-200 bg-white shadow-lg"
+                :style="{ top: `${menuTop}px` }"
             >
                 <div class="px-4 py-3 flex flex-col gap-2">
                     <a
@@ -143,6 +146,7 @@
                 </div>
             </div>
         </header>
+        </div>
 
         <div
             v-if="menuOpen"
@@ -150,6 +154,7 @@
             @click="menuOpen = false"
         ></div>
 
+        <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         <!-- Hero Section -->
         <section class="relative text-white py-8 sm:py-12 overflow-hidden">
             <!-- Background photo with soft blur -->
@@ -482,6 +487,7 @@
                 </div>
             </div>
         </footer>
+        </div>
     </div>
 </template>
 
@@ -490,27 +496,49 @@ import { computed, ref, onMounted } from "vue";
 import { Head, Link, usePage } from "@inertiajs/vue3";
 
 const menuOpen = ref(false);
+const headerEl = ref(null);
+const menuTop = ref(0);
+const scroller = ref(null);
 const page = usePage();
 const site = computed(() => page.props.site ?? {});
 
-onMounted(() => {
+function toggleMenu() {
+    menuOpen.value = !menuOpen.value;
+    if (menuOpen.value && headerEl.value) {
+        menuTop.value = headerEl.value.getBoundingClientRect().bottom;
+    }
+}
+
+function watchFadeIns(root, elements) {
     const observer = new IntersectionObserver(
         (entries) => {
             entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    const delay =
-                        entry.target.style.getPropertyValue("--delay") || "0ms";
-                    setTimeout(() => {
-                        entry.target.classList.add("is-visible");
-                    }, parseInt(delay));
-                    observer.unobserve(entry.target);
-                }
+                if (!entry.isIntersecting) return;
+                const delay =
+                    entry.target.style.getPropertyValue("--delay") || "0ms";
+                setTimeout(() => {
+                    entry.target.classList.add("is-visible");
+                }, parseInt(delay, 10));
+                observer.unobserve(entry.target);
             });
         },
-        { threshold: 0.1 },
+        { threshold: 0.1, root },
     );
 
-    document.querySelectorAll(".fade-in").forEach((el) => observer.observe(el));
+    elements.forEach((el) => observer.observe(el));
+}
+
+onMounted(() => {
+    const all = [...document.querySelectorAll(".fade-in")];
+    const root = scroller.value;
+    watchFadeIns(
+        root,
+        all.filter((el) => root?.contains(el)),
+    );
+    watchFadeIns(
+        null,
+        all.filter((el) => !root?.contains(el)),
+    );
 });
 </script>
 

@@ -70,6 +70,7 @@ import { computed } from "vue";
 import { usePage } from "@inertiajs/vue3";
 import SidebarNav from "../Components/SidebarNav.vue";
 import TopBar from "../Components/TopBar.vue";
+import { useRequestNotifications } from "../composables/useRequestNotifications.js";
 import { useSidebar } from "../composables/useSidebar.js";
 
 const page = usePage();
@@ -77,6 +78,8 @@ const { collapsed } = useSidebar();
 const role = computed(() => page.props.auth?.user?.role ?? "guest");
 const employeePages = computed(() => page.props.employeePages ?? null);
 const returnedCount = computed(() => page.props.returnedCount ?? 0);
+const { incoming } = useRequestNotifications();
+const incomingCount = computed(() => incoming.value.count ?? 0);
 
 const pageKeyByHref = {
     "/dashboard": "dashboard",
@@ -116,22 +119,41 @@ const baseSections = computed(() => [
     },
 ]);
 
-const adminSection = {
-    label: "Administration",
-    items: [
-        { label: "User Management", href: "/users", icon: "Users" },
-        { label: "Departments", href: "/departments", icon: "Building2" },
-        { label: "Review & Approval", href: "/approvals", icon: "ClipboardCheck" },
-        { label: "Request Reviews", href: "/requests", icon: "Inbox" },
-        { label: "Audit Trail", href: "/audit", icon: "ScrollText" },
-        { label: "Settings", href: "/settings", icon: "Settings" },
-    ],
-};
-
 const navSections = computed(() => {
+    const requestItem = {
+        label: "Request Reviews",
+        href: "/requests",
+        icon: "Inbox",
+        badge: incomingCount.value > 0 ? incomingCount.value : null,
+    };
+
     if (role.value === "admin") {
-        return [...baseSections.value, adminSection];
+        return [
+            ...baseSections.value,
+            {
+                label: "Administration",
+                items: [
+                    { label: "User Management", href: "/users", icon: "Users" },
+                    { label: "Departments", href: "/departments", icon: "Building2" },
+                    { label: "Review & Approval", href: "/approvals", icon: "ClipboardCheck" },
+                    requestItem,
+                    { label: "Audit Trail", href: "/audit", icon: "ScrollText" },
+                    { label: "Settings", href: "/settings", icon: "Settings" },
+                ],
+            },
+        ];
     }
+
+    if (role.value === "employee") {
+        return [
+            ...baseSections.value,
+            {
+                label: "Requests",
+                items: [requestItem],
+            },
+        ];
+    }
+
     return baseSections.value;
 });
 </script>

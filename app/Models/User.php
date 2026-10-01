@@ -33,6 +33,7 @@ class User extends Authenticatable
         'department',
         'position',
         'phone',
+        'contact_email',
         'status',
         'last_login_at',
         'signing_name',

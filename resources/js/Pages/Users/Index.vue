@@ -59,6 +59,7 @@
                                 <td class="px-4 py-3">
                                     <p class="font-semibold text-slate-900">{{ user.name }}</p>
                                     <p class="text-xs text-slate-400">{{ user.email }}</p>
+                                    <p v-if="user.contact_email" class="text-xs text-slate-500">{{ user.contact_email }}</p>
                                 </td>
                                 <td class="px-4 py-3">
                                     <span class="soft-chip">{{ user.role_label }}</span>
@@ -170,7 +171,25 @@
                             </span>
                         </div>
                         <p class="mt-1 text-[11px] text-gray-500">
-                            Full address: <span class="font-semibold text-[#003366]">{{ fullEmail || '—' }}</span>
+                            Login address: <span class="font-semibold text-[#003366]">{{ fullEmail || '—' }}</span>
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="contact_email">
+                            Contact Email <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                            id="contact_email"
+                            v-model="form.contact_email"
+                            type="email"
+                            class="soft-input"
+                            placeholder="name@example.com"
+                            autocomplete="off"
+                            required
+                        />
+                        <p class="mt-1 text-[11px] text-gray-500">
+                            Personal or outside email used to reach this person.
                         </p>
                     </div>
 
@@ -363,6 +382,7 @@ const isEdit = computed(() => editing.value !== null);
 const form = useForm({
     name: "",
     email_local: "",
+    contact_email: "",
     role: "employee",
     department: "",
     position: "",
@@ -404,6 +424,7 @@ function resetFormDefaults() {
     form.department = "";
     form.position = "";
     form.phone = "";
+    form.contact_email = "";
     form.password = "";
     form.password_confirmation = "";
 }
@@ -420,6 +441,7 @@ function openEdit(user) {
     form.clearErrors();
     form.name = user.name ?? "";
     form.email_local = user.email_local ?? "";
+    form.contact_email = user.contact_email ?? "";
     form.role = user.role ?? "employee";
     form.department = user.department ?? "";
     form.position = user.position ?? "";

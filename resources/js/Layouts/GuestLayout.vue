@@ -1,13 +1,13 @@
 <template>
-    <div class="min-h-screen bg-[#f5f5f5] text-gray-900 font-sans flex flex-col">
-
+    <div class="h-dvh overflow-hidden bg-[#f5f5f5] text-gray-900 font-sans flex flex-col">
+        <div class="relative z-50 shrink-0">
         <!-- Top Government Banner -->
         <div class="bg-[#003366] text-white text-[10px] sm:text-xs py-1 text-center tracking-widest uppercase leading-relaxed px-4">
             Republic of the Philippines &nbsp;|&nbsp; Province of Albay &nbsp;|&nbsp; Municipality of Oas
         </div>
 
         <!-- Header -->
-        <header class="relative z-50 bg-white border-b-4 border-[#FFD700] shadow-md">
+        <header ref="headerEl" class="relative z-50 bg-white border-b-4 border-[#FFD700] shadow-md">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
                 <!-- Branding -->
                 <Link href="/" class="flex items-center gap-3">
@@ -32,7 +32,7 @@
                 <!-- Mobile Hamburger -->
                 <button
                     v-if="currentNavItem"
-                    @click="menuOpen = !menuOpen"
+                    @click="toggleMenu"
                     class="md:hidden flex flex-col justify-center items-center gap-1.5 p-2 border border-[#003366] text-[#003366]"
                     aria-label="Toggle menu"
                 >
@@ -43,7 +43,11 @@
             </div>
 
             <!-- Mobile Menu Dropdown -->
-            <div v-if="menuOpen && currentNavItem" class="md:hidden absolute left-0 right-0 top-full z-50 border-t border-gray-200 bg-white shadow-lg">
+            <div
+                v-if="menuOpen && currentNavItem"
+                class="md:hidden fixed left-0 right-0 z-50 border-t border-gray-200 bg-white shadow-lg"
+                :style="{ top: `${menuTop}px` }"
+            >
                 <div class="px-4 py-3 flex flex-col gap-2">
                     <Link
                         :href="currentNavItem.href"
@@ -56,17 +60,19 @@
             </div>
         </header>
 
+        <!-- Notice Bar -->
+        <div class="bg-[#FFD700] text-[#003366] text-[10px] sm:text-xs py-2 text-center font-semibold tracking-wide px-4 leading-relaxed">
+            Office Hours: {{ site.office_hours || 'Monday to Friday, 8:00 AM – 5:00 PM' }} &nbsp;|&nbsp; Hotline: {{ site.hotline || '(052) 555-0198' }}
+        </div>
+        </div>
+
         <div
             v-if="menuOpen"
             class="fixed inset-0 z-40 bg-black/30 md:hidden"
             @click="menuOpen = false"
         ></div>
 
-        <!-- Notice Bar -->
-        <div class="bg-[#FFD700] text-[#003366] text-[10px] sm:text-xs py-2 text-center font-semibold tracking-wide px-4 leading-relaxed">
-            Office Hours: {{ site.office_hours || 'Monday to Friday, 8:00 AM – 5:00 PM' }} &nbsp;|&nbsp; Hotline: {{ site.hotline || '(052) 555-0198' }}
-        </div>
-
+        <div class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
         <main class="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 pb-10 sm:pb-12 pt-8 sm:pt-10">
             <Link href="/" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#003366] transition mb-6">
                 &larr; Back to Home
@@ -84,6 +90,7 @@
                 </div>
             </div>
         </footer>
+        </div>
     </div>
 </template>
 
@@ -92,7 +99,16 @@ import { computed, ref } from "vue";
 import { Link, usePage } from "@inertiajs/vue3";
 
 const menuOpen = ref(false);
+const headerEl = ref(null);
+const menuTop = ref(0);
 const page = usePage();
+
+function toggleMenu() {
+    menuOpen.value = !menuOpen.value;
+    if (menuOpen.value && headerEl.value) {
+        menuTop.value = headerEl.value.getBoundingClientRect().bottom;
+    }
+}
 const site = computed(() => page.props.site ?? {});
 
 const navItems = [

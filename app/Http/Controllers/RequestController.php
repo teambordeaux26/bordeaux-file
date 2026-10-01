@@ -7,13 +7,17 @@ use App\Mail\RequestCompletedMail;
 use App\Models\AuditLog;
 use App\Models\Certificate;
 use App\Models\DocumentRequest;
+use App\Models\DocumentRequestAttachment;
 use App\Models\RequestType;
 use App\Rules\OasBarangayAddress;
 use App\Services\CertificateIssuanceService;
 use App\Services\CertificatePdfService;
 use App\Services\CertificateSignatureService;
+use App\Support\RequestNotifications;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -40,6 +44,8 @@ class RequestController extends Controller
                 Rule::exists('request_types', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
             'details'           => 'nullable|string|max:2000',
+            'attachments'       => 'nullable|array|max:10',
+            'attachments.*'     => 'file|mimes:pdf,doc,docx,ppt,pptx,png,jpg,jpeg|max:10240',
         ]);
 
         $type = RequestType::query()
@@ -57,27 +63,115 @@ class RequestController extends Controller
         $count    = DocumentRequest::whereYear('created_at', $year)->count() + 1;
         $tracking = 'REQ-' . $year . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
-        DocumentRequest::create([
-            'requester_name'    => $validated['requester_name'],
-            'requester_email'   => $validated['requester_email'],
-            'requester_phone'   => $validated['requester_phone'] ?? null,
-            'requester_address' => $validated['requester_address'],
-            'request_type_id'   => $type->id,
-            'request_type'      => $type->name,
-            'purpose'           => $type->purpose,
-            'details'           => $validated['details'] ?? null,
-            'tracking_number'   => $tracking,
-            'status'            => 'pending',
-        ]);
+        $stored = $this->storeAttachments($request->file('attachments', []));
+
+        if ($stored === null) {
+            return back()->withErrors([
+                'attachments' => 'The files could not be saved. Please try again.',
+            ])->withInput();
+        }
+
+        try {
+            DB::transaction(function () use ($validated, $type, $tracking, $stored) {
+                $record = DocumentRequest::create([
+                    'requester_name'    => $validated['requester_name'],
+                    'requester_email'   => $validated['requester_email'],
+                    'requester_phone'   => $validated['requester_phone'] ?? null,
+                    'requester_address' => $validated['requester_address'],
+                    'request_type_id'   => $type->id,
+                    'request_type'      => $type->name,
+                    'purpose'           => $type->purpose,
+                    'details'           => $validated['details'] ?? null,
+                    'tracking_number'   => $tracking,
+                    'status'            => 'pending',
+                ]);
+
+                if ($stored !== []) {
+                    $record->attachments()->createMany($stored);
+                }
+            });
+        } catch (\Throwable $e) {
+            $this->deleteStoredAttachments($stored);
+
+            throw $e;
+        }
 
         return redirect()->route('requests.status', ['tracking' => $tracking]);
     }
 
+    public function downloadAttachment(DocumentRequest $documentRequest, DocumentRequestAttachment $attachment)
+    {
+        abort_unless($attachment->document_request_id === $documentRequest->id, 404);
+        abort_unless(Storage::disk('local')->exists($attachment->path), 404);
+
+        return Storage::disk('local')->download(
+            $attachment->path,
+            $attachment->name ?: 'request-attachment'
+        );
+    }
+
+    /**
+     * @param  array<int, UploadedFile>|UploadedFile|null  $files
+     * @return list<array{path: string, name: string}>|null
+     */
+    private function storeAttachments(array|UploadedFile|null $files): ?array
+    {
+        if ($files instanceof UploadedFile) {
+            $files = [$files];
+        }
+
+        $files = array_values($files ?? []);
+        $stored = [];
+
+        foreach ($files as $file) {
+            $path = $file->store('request-attachments', 'local');
+
+            if (! $path) {
+                $this->deleteStoredAttachments($stored);
+
+                return null;
+            }
+
+            $stored[] = [
+                'path' => $path,
+                'name' => $this->attachmentName($file),
+            ];
+        }
+
+        return $stored;
+    }
+
+    /**
+     * @param  list<array{path: string, name: string}>  $stored
+     */
+    private function deleteStoredAttachments(array $stored): void
+    {
+        $paths = array_column($stored, 'path');
+
+        if ($paths !== []) {
+            Storage::disk('local')->delete($paths);
+        }
+    }
+
+    private function attachmentName(UploadedFile $file): string
+    {
+        $name = basename(str_replace('\\', '/', $file->getClientOriginalName()));
+        $name = preg_replace('/[^\pL\pN.\- ()]+/u', '_', $name) ?? '';
+        $name = trim($name, '. ');
+
+        return $name !== '' ? mb_substr($name, 0, 255) : 'attachment';
+    }
+
     // ── Admin ──────────────────────────────────────────────────────────────
+
+    public function notifications(Request $request)
+    {
+        return response()->json(RequestNotifications::forUser($request->user()));
+    }
 
     public function adminIndex(CertificateSignatureService $signatures)
     {
-        $requests = DocumentRequest::with(['processor', 'type'])
+        $requests = DocumentRequest::with(['processor', 'type', 'attachments'])
             ->latest()
             ->get()
             ->map(fn($r) => [
@@ -90,6 +184,11 @@ class RequestController extends Controller
                 'purpose'              => $r->connectedPurpose(),
                 'issues_certificate'   => $r->issuesCertificate(),
                 'details'              => $r->details,
+                'attachments'          => $r->attachments->map(fn ($file) => [
+                    'id'   => $file->id,
+                    'name' => $file->name,
+                    'url'  => route('requests.attachment', [$r, $file]),
+                ])->values(),
                 'status'               => $r->status,
                 'has_file'             => (bool) $r->response_file_path,
                 'file_name'            => $r->response_file_name,
@@ -288,7 +387,7 @@ class RequestController extends Controller
         $notFound = false;
 
         if ($tracking) {
-            $doc = DocumentRequest::with('type')->where('tracking_number', strtoupper(trim($tracking)))->first();
+            $doc = DocumentRequest::with(['type', 'attachments'])->where('tracking_number', strtoupper(trim($tracking)))->first();
 
             if ($doc) {
                 $result = [
@@ -301,6 +400,9 @@ class RequestController extends Controller
                     'purpose'           => $doc->connectedPurpose(),
                     'issues_certificate'=> $doc->issuesCertificate(),
                     'details'           => $doc->details,
+                    'attachments'       => $doc->attachments->map(fn ($file) => [
+                        'name' => $file->name,
+                    ])->values(),
                     'status'            => $doc->status,
                     'submitted_at'      => $doc->created_at->format('M d, Y'),
                     'processed_at'      => $doc->processed_at?->format('M d, Y'),

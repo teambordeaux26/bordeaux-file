@@ -79,6 +79,14 @@
                         <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Details</p>
                         <p class="text-gray-700 leading-relaxed">{{ result.details }}</p>
                     </div>
+                    <div v-if="result.attachments?.length" class="sm:col-span-2">
+                        <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Files Submitted</p>
+                        <ul class="space-y-1">
+                            <li v-for="(file, index) in result.attachments" :key="`${file.name}-${index}`" class="text-gray-900">
+                                {{ file.name }}
+                            </li>
+                        </ul>
+                    </div>
                 </div>
 
                 <div
