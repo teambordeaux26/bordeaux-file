@@ -6,12 +6,16 @@ use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\DocumentCategory;
 use App\Services\DocumentRetentionService;
+use App\Support\OfficeTime;
+use App\Support\ReportPeriod;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class ArchiveController extends Controller
 {
+    use ExportsSectionReports;
     public function index(Request $request, DocumentRetentionService $retentionService)
     {
         $retentionService->archiveExpired();
@@ -21,6 +25,7 @@ class ArchiveController extends Controller
             'category_id' => 'nullable|integer|exists:document_categories,id',
             'retention_days' => 'nullable|integer|in:7,30,90,180,365,730,1825',
             'year' => 'nullable|integer|min:2000|max:2100',
+            ...ReportPeriod::requestRules(),
         ]);
 
         $base = Document::query()
@@ -41,11 +46,11 @@ class ArchiveController extends Controller
         if (! empty($filters['q'])) {
             $term = $filters['q'];
             $query->where(function ($builder) use ($term) {
-                $builder->where('title', 'like', "%{$term}%")
-                    ->orWhere('tracking_number', 'like', "%{$term}%")
-                    ->orWhere('reference_no', 'like', "%{$term}%")
-                    ->orWhereHas('submitter', fn ($rel) => $rel->where('name', 'like', "%{$term}%"))
-                    ->orWhereHas('category', fn ($rel) => $rel->where('name', 'like', "%{$term}%"));
+                TextSearch::contains($builder, 'title', $term);
+                TextSearch::contains($builder, 'tracking_number', $term, true);
+                TextSearch::contains($builder, 'reference_no', $term, true);
+                $builder->orWhereHas('submitter', fn ($rel) => TextSearch::contains($rel, 'name', $term));
+                $builder->orWhereHas('category', fn ($rel) => TextSearch::contains($rel, 'name', $term));
             });
         }
 
@@ -81,7 +86,7 @@ class ArchiveController extends Controller
                 'retention' => $d->retention_days
                     ? DocumentRetentionService::formatRetention($d->retention_days)
                     : '—',
-                'archived' => $d->archived_at?->format('M d, Y') ?? $d->updated_at->format('M d, Y'),
+                'archived' => OfficeTime::exact($d->archived_at ?? $d->updated_at),
                 'view_url' => route('documents.show', $d->id),
                 'download_url' => $d->file_path
                     ? route('documents.file', $d->id)
@@ -96,6 +101,10 @@ class ArchiveController extends Controller
                 ->map(fn ($label, $days) => ['value' => $days, 'label' => $label])
                 ->values(),
             'years' => $years,
+            'report' => ($period = $this->reportPeriodFrom($request))['ready']
+                ? $this->reports()->archive($period['start'], $period['end'], $period['period'])
+                : $this->emptyReport(),
+            'reportRange' => ($period['label'] ?? ''),
             'filters' => [
                 'q' => $filters['q'] ?? '',
                 'category_id' => isset($filters['category_id']) ? (string) $filters['category_id'] : '',
@@ -126,16 +135,53 @@ class ArchiveController extends Controller
         $document->update([
             'status'      => 'approved',
             'archived_at' => null,
+            'restored_at' => now(),
+            'restored_by' => Auth::id(),
         ]);
+
+        $when = OfficeTime::exact(now());
+        $actor = Auth::user()->name;
 
         AuditLog::create([
             'user_id'     => Auth::id(),
             'action'      => 'Document Restored',
-            'description' => "Document {$document->tracking_number} restored from archive.",
+            'description' => "File {$document->tracking_number} was restored on {$when} by {$actor}.",
             'ip_address'  => request()->ip(),
+            'meta'        => [
+                'document_id' => $document->id,
+                'category_id' => $document->category_id,
+            ],
         ]);
 
         return redirect()->back()
-            ->with('success', "Document {$document->tracking_number} restored successfully.");
+            ->with('success', "File {$document->tracking_number} was restored on {$when} by {$actor}.");
+    }
+
+    public function exportReport(Request $request)
+    {
+        $data = $request->validate(\App\Support\ReportPeriod::exportRules());
+        $period = $this->reportPeriodFrom($request);
+        $rows = $this->reports()->archiveRows($period['start'], $period['end']);
+        $report = $this->reports()->archive($period['start'], $period['end'], $period['period']);
+        $format = $data['format'] ?? 'csv';
+        $stamp = $period['from'].'-to-'.$period['to'];
+
+        if ($format === 'pdf') {
+            return $this->downloadReportPdf('pdf.reports.simple', "archive-{$stamp}.pdf", [
+                'title' => 'Archive Report',
+                'office' => 'Office of the Vice Mayor — Oas, Albay',
+                'range' => $period['label'],
+                'generatedAt' => now()->format('F j, Y g:i A'),
+                'report' => $report,
+                'columns' => ['Archived', 'Tracking No.', 'Title', 'Category', 'Retention', 'Submitted By'],
+                'rows' => $rows,
+            ]);
+        }
+
+        return $this->streamCsv(
+            "archive-{$stamp}.csv",
+            ['Archived', 'Tracking No.', 'Title', 'Category', 'Retention', 'Submitted By'],
+            $rows
+        );
     }
 }

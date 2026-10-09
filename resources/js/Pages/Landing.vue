@@ -212,6 +212,16 @@
                             Submit a Request
                         </Link>
                     </div>
+                    <div class="flex items-center gap-3 pt-2">
+                        <img
+                            :src="'/requests/qr'"
+                            alt="Scan to open the document request form"
+                            class="h-24 w-24 bg-white p-1"
+                        />
+                        <p class="max-w-[14rem] text-xs text-blue-100">
+                            Scan this code to open the document request form.
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Logo -->

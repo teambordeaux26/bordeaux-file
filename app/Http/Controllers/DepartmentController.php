@@ -16,6 +16,7 @@ class DepartmentController extends Controller
     {
         $filters = $request->validate([
             'q' => 'nullable|string|max:255',
+            'status' => 'nullable|in:active,inactive',
         ]);
 
         $query = Department::query()->orderBy('name');
@@ -23,9 +24,13 @@ class DepartmentController extends Controller
         if (! empty($filters['q'])) {
             $q = $filters['q'];
             $query->where(function ($builder) use ($q) {
-                $builder->where('name', 'like', "%{$q}%")
-                    ->orWhere('code', 'like', "%{$q}%");
+                $builder->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($q).'%'])
+                    ->orWhereRaw('LOWER(code) LIKE ?', ['%'.mb_strtolower($q).'%']);
             });
+        }
+
+        if (! empty($filters['status'])) {
+            $query->where('status', $filters['status']);
         }
 
         $departments = $query
@@ -48,6 +53,7 @@ class DepartmentController extends Controller
             'statusOptions' => ['active', 'inactive'],
             'filters'       => [
                 'q' => $filters['q'] ?? '',
+                'status' => $filters['status'] ?? '',
             ],
         ]);
     }
@@ -74,31 +80,6 @@ class DepartmentController extends Controller
             ->with('success', "Department '{$department->name}' created.");
     }
 
-    public function destroy(Request $request, Department $department)
-    {
-        $memberCount = User::where('department', $department->name)->count();
-
-        if ($memberCount > 0) {
-            return redirect()->route('departments.index')->with(
-                'error',
-                "Cannot delete '{$department->name}' — {$memberCount} user(s) are still assigned to it. Reassign them first."
-            );
-        }
-
-        $name = $department->name;
-        $department->delete();
-
-        AuditLog::create([
-            'user_id'     => Auth::id(),
-            'action'      => 'Department Deleted',
-            'description' => "Deleted department '{$name}'.",
-            'ip_address'  => $request->ip(),
-        ]);
-
-        return redirect()->route('departments.index')
-            ->with('success', "Department '{$name}' deleted.");
-    }
-
     public function update(Request $request, Department $department)
     {
         $data = $request->validate([
@@ -109,6 +90,7 @@ class DepartmentController extends Controller
         ]);
 
         $oldName = $department->name;
+        $oldStatus = $department->status;
 
         $department->update($data);
 
@@ -116,10 +98,19 @@ class DepartmentController extends Controller
             User::where('department', $oldName)->update(['department' => $department->name]);
         }
 
+        $when = now()->format('F d, Y, \a\t g:i A');
+        $actor = Auth::user()->name;
+        $description = "Updated department '{$oldName}' to '{$department->name}'.";
+
+        if ($oldStatus !== $department->status) {
+            $verb = $department->status === 'active' ? 'activated' : 'deactivated';
+            $description = "Department '{$department->name}' was {$verb} on {$when} by {$actor}.";
+        }
+
         AuditLog::create([
             'user_id'     => Auth::id(),
             'action'      => 'Department Updated',
-            'description' => "Updated department '{$oldName}' → '{$department->name}'.",
+            'description' => $description,
             'ip_address'  => $request->ip(),
         ]);
 

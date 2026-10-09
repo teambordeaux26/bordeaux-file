@@ -20,11 +20,25 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class RequestController extends Controller
 {
+    public function qr()
+    {
+        $svg = QrCode::format('svg')
+            ->size(220)
+            ->margin(1)
+            ->generate(url('/requests/new'));
+
+        return response((string) $svg, 200, [
+            'Content-Type' => 'image/svg+xml',
+            'Cache-Control' => 'public, max-age=3600',
+        ]);
+    }
+
     public function create()
     {
         return Inertia::render('Requests/Create', [

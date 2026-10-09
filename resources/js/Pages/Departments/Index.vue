@@ -96,12 +96,13 @@
                                         </button>
                                         <button
                                             type="button"
-                                            class="text-xs font-semibold uppercase tracking-wider px-3 py-1.5 border border-red-300 text-red-700 bg-white hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                            :disabled="dept.user_count > 0"
-                                            :title="dept.user_count > 0 ? 'Cannot delete — this department has members.' : 'Delete department'"
-                                            @click="confirmDelete(dept)"
+                                            class="text-xs font-semibold uppercase tracking-wider px-3 py-1.5 border bg-white transition"
+                                            :class="dept.status === 'active'
+                                                ? 'border-amber-300 text-amber-800 hover:bg-amber-50'
+                                                : 'border-emerald-300 text-emerald-800 hover:bg-emerald-50'"
+                                            @click="setStatus(dept, dept.status === 'active' ? 'inactive' : 'active')"
                                         >
-                                            Delete
+                                            {{ dept.status === 'active' ? 'Deactivate' : 'Activate' }}
                                         </button>
                                     </div>
                                 </td>
@@ -112,61 +113,6 @@
 
                 <Pagination :paginator="departments" />
             </SectionCard>
-        </div>
-
-        <!-- Delete confirmation modal -->
-        <div
-            v-if="deleteTarget"
-            class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-            @click.self="cancelDelete"
-        >
-            <div class="w-full max-w-md bg-white border-t-4 border-red-500 shadow-lg">
-                <div class="flex items-start justify-between gap-3 border-b border-gray-200 px-5 py-3">
-                    <div>
-                        <p class="text-[10px] uppercase tracking-widest text-red-600 font-semibold">
-                            Confirm Delete
-                        </p>
-                        <h3 class="text-base font-bold text-red-700">
-                            Delete Department
-                        </h3>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center h-8 w-8 border border-gray-300 text-gray-500 hover:bg-gray-50"
-                        aria-label="Close"
-                        @click="cancelDelete"
-                    >
-                        <X class="h-4 w-4" :stroke-width="2.25" />
-                    </button>
-                </div>
-                <div class="p-5">
-                    <p class="text-sm text-gray-700">
-                        Are you sure you want to permanently delete
-                        <span class="font-semibold text-[#003366]">"{{ deleteTarget.name }}"</span>?
-                    </p>
-                    <p class="mt-2 text-xs text-gray-500">
-                        This action cannot be undone.
-                    </p>
-                </div>
-                <div class="px-5 pb-4 flex justify-end gap-2">
-                    <button
-                        type="button"
-                        class="px-3 py-1.5 border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                        :disabled="deleting"
-                        @click="cancelDelete"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        class="px-3 py-1.5 border border-red-600 bg-red-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-red-700 transition disabled:opacity-60"
-                        :disabled="deleting"
-                        @click="doDelete"
-                    >
-                        {{ deleting ? 'Deleting…' : 'Delete Department' }}
-                    </button>
-                </div>
-            </div>
         </div>
 
         <!-- Add / Edit modal -->
@@ -316,28 +262,13 @@ const modalOpen = ref(false);
 const editing = ref(null);
 const isEdit = computed(() => editing.value !== null);
 
-const deleteTarget = ref(null);
-const deleting = ref(false);
-
-function confirmDelete(dept) {
-    deleteTarget.value = dept;
-}
-
-function cancelDelete() {
-    if (deleting.value) return;
-    deleteTarget.value = null;
-}
-
-function doDelete() {
-    if (!deleteTarget.value) return;
-    deleting.value = true;
-    router.delete(`/departments/${deleteTarget.value.id}`, {
-        preserveScroll: true,
-        onFinish: () => {
-            deleting.value = false;
-            deleteTarget.value = null;
-        },
-    });
+function setStatus(dept, status) {
+    router.put(`/departments/${dept.id}`, {
+        name: dept.name,
+        code: dept.code || "",
+        description: dept.description || "",
+        status,
+    }, { preserveScroll: true });
 }
 
 const form = useForm({
@@ -397,12 +328,11 @@ function submit() {
 
 function onEsc(e) {
     if (e.key !== "Escape") return;
-    if (deleteTarget.value) cancelDelete();
-    else if (modalOpen.value) closeModal();
+    if (modalOpen.value) closeModal();
 }
 
 watch(
-    () => modalOpen.value || deleteTarget.value !== null,
+    () => modalOpen.value,
     (open) => {
         if (typeof document === "undefined") return;
         document.body.style.overflow = open ? "hidden" : "";

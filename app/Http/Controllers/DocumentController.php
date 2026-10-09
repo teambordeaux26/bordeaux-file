@@ -9,7 +9,9 @@ use App\Models\DocumentStatusUpdate;
 use App\Models\User;
 use App\Services\DocumentRetentionService;
 use App\Support\DocumentStatus;
+use App\Support\OfficeTime;
 use App\Support\ReportPeriod;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -40,9 +42,9 @@ class DocumentController extends Controller
         if (! empty($filters['q'])) {
             $q = $filters['q'];
             $query->where(function ($builder) use ($q) {
-                $builder->where('title', 'like', "%{$q}%")
-                    ->orWhere('tracking_number', 'like', "%{$q}%")
-                    ->orWhere('reference_no', 'like', "%{$q}%");
+                TextSearch::contains($builder, 'title', $q);
+                TextSearch::contains($builder, 'tracking_number', $q, true);
+                TextSearch::contains($builder, 'reference_no', $q, true);
             });
         }
 
@@ -117,14 +119,17 @@ class DocumentController extends Controller
         );
     }
 
-    public function uploadForm()
+    public function uploadForm(Request $request)
     {
+        $selected = $request->integer('category_id');
+
         return Inertia::render('Documents/Upload', [
             'categories'       => DocumentCategory::treeForForms(),
             'refNumber'        => $this->generateReferenceNumber(),
             'retentionOptions' => $this->retentionOptions(),
             'staff'            => User::staffOptions(Auth::id()),
             'currentUserId'    => Auth::id(),
+            'selectedCategoryId' => $selected > 0 ? $selected : null,
         ]);
     }
 
@@ -306,7 +311,7 @@ class DocumentController extends Controller
             $query->where('submitted_by', $user->id);
         }
 
-        $documents = $query->get()->map(function (Document $doc) {
+        $documents = $query->paginate(10)->withQueryString()->through(function (Document $doc) {
             $context = $this->returnContext($doc);
 
             return [
@@ -317,7 +322,7 @@ class DocumentController extends Controller
                 'category'      => $doc->category?->label() ?? '—',
                 'priority'      => $doc->priority,
                 'owner'         => $doc->submitter?->name ?? '—',
-                'returned_at'   => $doc->returned_at?->diffForHumans(),
+                'returned_at'   => OfficeTime::exact($doc->returned_at),
                 'returned_from' => $context['from_label'],
                 'returned_by'   => $context['by'],
                 'remarks'       => $context['remarks'],
@@ -538,7 +543,7 @@ class DocumentController extends Controller
             'owner'         => $doc->submitter?->name ?? '—',
             'handler'       => $doc->handler?->name ?? 'Unassigned',
             'restricted'    => $doc->allowedUsers->isNotEmpty(),
-            'updated'       => $doc->updated_at->diffForHumans(),
+            'updated'       => OfficeTime::exact($doc->updated_at),
             'retention'     => $doc->retention_days
                 ? DocumentRetentionService::formatRetention($doc->retention_days)
                 : '—',

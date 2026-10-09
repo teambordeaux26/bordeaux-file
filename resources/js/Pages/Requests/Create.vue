@@ -12,6 +12,20 @@
                 </p>
             </div>
 
+            <div class="bg-white border border-gray-300 px-4 py-4 flex items-center gap-4">
+                <img
+                    :src="'/requests/qr'"
+                    alt="Scan to open the document request form"
+                    class="h-28 w-28 border border-gray-200"
+                />
+                <div>
+                    <p class="text-xs uppercase tracking-widest text-gray-500 font-semibold">Scan to request</p>
+                    <p class="mt-1 text-sm text-gray-700">
+                        Scan this code with a phone camera to open this form and submit a document request.
+                    </p>
+                </div>
+            </div>
+
             <!-- Info Notice -->
             <div class="bg-[#003366]/5 border border-[#003366]/20 px-4 py-3 text-xs text-gray-700 leading-relaxed">
                 <span class="font-bold text-[#003366]">Important:</span> All fields are required unless noted.

@@ -111,7 +111,7 @@
                         </h3>
                         <p class="mt-0.5 text-xs text-gray-500">
                             Emails are automatically issued under
-                            <span class="font-semibold text-[#003366]">{{ emailDomain }}</span>.
+                            <span class="font-semibold text-[#003366]">{{ loginDomain }}</span>.
                         </p>
                     </div>
                     <button
@@ -167,7 +167,7 @@
                                 @input="normalizeLocal"
                             />
                             <span class="flex items-center px-3 bg-white border-l border-gray-300 text-xs font-semibold text-[#003366]">
-                                {{ emailDomain }}
+                                {{ loginDomain }}
                             </span>
                         </div>
                         <p class="mt-1 text-[11px] text-gray-500">
@@ -392,8 +392,14 @@ const form = useForm({
     password_confirmation: "",
 });
 
+const loginDomain = computed(() =>
+    isEdit.value && editing.value?.email_domain
+        ? editing.value.email_domain
+        : props.emailDomain
+);
+
 const fullEmail = computed(() =>
-    form.email_local ? form.email_local.toLowerCase() + props.emailDomain : ""
+    form.email_local ? form.email_local.toLowerCase() + loginDomain.value : ""
 );
 
 function capitalize(s) {

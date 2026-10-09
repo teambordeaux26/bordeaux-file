@@ -200,11 +200,12 @@ const props = defineProps({
     retentionOptions: { type: Array, default: () => [] },
     staff:            { type: Array, default: () => [] },
     currentUserId:    { type: Number, default: null },
+    selectedCategoryId: { type: Number, default: null },
 });
 
 const form = useForm({
     title:            '',
-    category_id:      null,
+    category_id:      props.selectedCategoryId,
     priority:         'Standard',
     retention_days:   7,
     description:      '',

@@ -104,7 +104,15 @@ const baseSections = computed(() => [
         label: "Operations",
         items: filterNavItems([
             { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-            { label: "Documents", href: "/documents", icon: "FileText" },
+            {
+                label: "Documents",
+                href: "/documents",
+                icon: "FileText",
+                children: (page.props.documentFolders ?? []).map((folder) => ({
+                    label: `${folder.number} ${folder.name}`,
+                    href: folder.href,
+                })),
+            },
             { label: "Workflow", href: "/workflow", icon: "GitBranch" },
             {
                 label: "Returned Documents",

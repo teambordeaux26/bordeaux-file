@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\User;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -26,9 +26,9 @@ class UserController extends Controller
         if (! empty($filters['q'])) {
             $q = $filters['q'];
             $query->where(function ($builder) use ($q) {
-                $builder->where('name', 'like', "%{$q}%")
-                    ->orWhere('email', 'like', "%{$q}%")
-                    ->orWhere('contact_email', 'like', "%{$q}%");
+                TextSearch::contains($builder, 'name', $q);
+                TextSearch::contains($builder, 'email', $q, true);
+                TextSearch::contains($builder, 'contact_email', $q, true);
             });
         }
 
@@ -39,12 +39,16 @@ class UserController extends Controller
                 $emailLocal = str_ends_with(strtolower($u->email), static::EMAIL_DOMAIN)
                     ? substr($u->email, 0, -strlen(static::EMAIL_DOMAIN))
                     : explode('@', $u->email)[0];
+                $emailDomain = str_contains($u->email, '@')
+                    ? strstr($u->email, '@')
+                    : static::EMAIL_DOMAIN;
 
                 return [
                     'id'           => $u->id,
                     'name'         => $u->name,
                     'email'        => $u->email,
                     'email_local'  => $emailLocal,
+                    'email_domain' => $emailDomain,
                     'role'         => $u->role ?? 'employee',
                     'role_label'   => ucfirst($u->role ?? 'employee'),
                     'department'   => $u->department ?? '',
@@ -106,7 +110,7 @@ class UserController extends Controller
         $user = User::create([
             'name'       => $data['name'],
             'email'      => $email,
-            'password'   => Hash::make($data['password']),
+            'password'   => $data['password'],
             'role'       => $data['role'],
             'department' => ($data['department'] ?? null) ?: null,
             'position'   => ($data['position'] ?? null) ?: null,
@@ -162,7 +166,15 @@ class UserController extends Controller
             }
         }
 
-        $email = strtolower($data['email_local']) . static::EMAIL_DOMAIN;
+        $keptDomain = str_contains((string) $user->email, '@')
+            ? strstr($user->email, '@')
+            : static::EMAIL_DOMAIN;
+        $currentLocal = str_ends_with(strtolower($user->email), strtolower($keptDomain))
+            ? substr($user->email, 0, -strlen($keptDomain))
+            : explode('@', $user->email)[0];
+        $email = strtolower($data['email_local']) === strtolower($currentLocal)
+            ? strtolower($currentLocal).$keptDomain
+            : strtolower($data['email_local']).static::EMAIL_DOMAIN;
 
         if (User::where('email', $email)->where('id', '!=', $user->id)->exists()) {
             return back()
@@ -181,8 +193,12 @@ class UserController extends Controller
             'status'        => $data['status'],
         ]);
 
+        $passwordChanged = false;
+
         if (! empty($data['password'])) {
-            $user->password = Hash::make($data['password']);
+            $user->password = $data['password'];
+            $user->remember_token = null;
+            $passwordChanged = true;
         }
 
         $user->save();
@@ -190,7 +206,9 @@ class UserController extends Controller
         AuditLog::create([
             'user_id'     => Auth::id(),
             'action'      => 'User Updated',
-            'description' => "Updated user account for {$user->name} ({$user->email}).",
+            'description' => $passwordChanged
+                ? "Updated user account for {$user->name} ({$user->email}) and set a new password on ".now()->format('F d, Y, \a\t g:i A')." by ".Auth::user()->name."."
+                : "Updated user account for {$user->name} ({$user->email}).",
             'ip_address'  => $request->ip(),
         ]);
 

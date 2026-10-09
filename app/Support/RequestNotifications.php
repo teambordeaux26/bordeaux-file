@@ -31,7 +31,7 @@ class RequestNotifications
                     'tracking' => $request->tracking_number,
                     'name' => $request->requester_name,
                     'type' => $request->request_type,
-                    'submitted' => $request->created_at?->diffForHumans() ?? '',
+                    'submitted' => OfficeTime::exact($request->created_at),
                 ])
                 ->all(),
         ];

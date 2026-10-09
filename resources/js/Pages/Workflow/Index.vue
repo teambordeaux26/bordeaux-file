@@ -126,6 +126,39 @@
                 </div>
             </SectionCard>
 
+            <SectionCard
+                title="Restored Documents"
+                eyebrow="Archive"
+                subtitle="Files brought back from the archive, with the date, time, and staff member who restored them."
+            >
+                <p v-if="!restoredRows.length" class="py-4 text-center text-sm text-slate-500">
+                    No documents have been restored.
+                </p>
+                <div v-else class="divide-y divide-gray-200">
+                    <div
+                        v-for="item in restoredPage"
+                        :key="item.id"
+                        class="flex flex-wrap items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                    >
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-[#003366]">{{ item.tracking }} · {{ item.title }}</p>
+                            <p class="mt-0.5 text-xs text-slate-500">{{ item.summary }}</p>
+                            <p class="text-xs text-slate-400">{{ item.category }}</p>
+                        </div>
+                        <Link :href="item.view_url" class="text-xs font-bold uppercase tracking-wider text-[#003366] underline">
+                            View
+                        </Link>
+                    </div>
+                </div>
+                <div v-if="restoredRows.length > restoredPageSize" class="mt-3 flex items-center justify-between text-xs text-gray-600">
+                    <p>Page {{ restoredPageNumber }} of {{ restoredPageCount }}</p>
+                    <div class="flex gap-2">
+                        <button type="button" class="soft-button-light" :disabled="restoredPageNumber <= 1" @click="restoredPageNumber--">Previous</button>
+                        <button type="button" class="soft-button-light" :disabled="restoredPageNumber >= restoredPageCount" @click="restoredPageNumber++">Next</button>
+                    </div>
+                </div>
+            </SectionCard>
+
             <!-- Kanban board -->
             <div class="-mx-2 overflow-x-auto pb-2">
                 <div class="flex gap-4 px-2 min-w-max">
@@ -418,6 +451,16 @@ const props = defineProps({
     legend: { type: Array, default: () => [] },
     currentUser: { type: Object, default: () => ({}) },
     filters: { type: Object, default: () => ({}) },
+    restored: { type: Array, default: () => [] },
+});
+
+const restoredRows = computed(() => props.restored ?? []);
+const restoredPageSize = 6;
+const restoredPageNumber = ref(1);
+const restoredPageCount = computed(() => Math.max(1, Math.ceil(restoredRows.value.length / restoredPageSize)));
+const restoredPage = computed(() => {
+    const start = (restoredPageNumber.value - 1) * restoredPageSize;
+    return restoredRows.value.slice(start, start + restoredPageSize);
 });
 
 const filterOptions = computed(() => ({

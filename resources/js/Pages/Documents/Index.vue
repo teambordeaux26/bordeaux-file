@@ -24,33 +24,53 @@
                     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">All categories</p>
                     <p class="mt-1 text-lg font-bold text-[#003366]">{{ totalCategoryCount }}</p>
                 </button>
-                <button
-                    v-for="cat in categoryTree"
+                <div
+                    v-for="(cat, index) in categoryTree"
                     :key="cat.id"
-                    type="button"
                     class="border px-4 py-3 text-left transition"
                     :class="Number(filterCategory) === Number(cat.id) ? 'border-[#003366] bg-blue-50' : 'border-gray-300 bg-white hover:border-[#003366]'"
-                    @click="selectCategory(cat.id)"
                 >
-                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">{{ cat.name }}</p>
-                    <p class="mt-1 text-lg font-bold text-[#003366]">{{ cat.count }}</p>
-                </button>
+                    <button type="button" class="w-full text-left" @click="selectCategory(cat.id)">
+                        <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                            {{ String(index + 1).padStart(2, "0") }} · {{ cat.name }}
+                        </p>
+                        <p class="mt-1 text-lg font-bold text-[#003366]">{{ cat.count }}</p>
+                    </button>
+                    <Link
+                        v-if="!cat.children?.length"
+                        :href="`/documents/upload?category_id=${cat.id}`"
+                        class="mt-2 inline-block text-[11px] font-bold uppercase tracking-wider text-[#003366] underline"
+                    >
+                        Upload to this folder
+                    </Link>
+                </div>
             </div>
 
             <div
                 v-if="selectedParent?.children?.length"
                 class="flex flex-wrap gap-2"
             >
-                <button
-                    v-for="child in selectedParent.children"
+                <div
+                    v-for="(child, childIndex) in selectedParent.children"
                     :key="child.id"
-                    type="button"
-                    class="px-3 py-1.5 text-xs font-semibold border"
+                    class="inline-flex items-center border"
                     :class="Number(filterCategory) === Number(child.id) ? 'bg-[#003366] text-white border-[#003366]' : 'bg-white text-[#003366] border-[#003366]'"
-                    @click="selectCategory(child.id)"
                 >
-                    {{ child.name }} ({{ child.count }})
-                </button>
+                    <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-semibold"
+                        @click="selectCategory(child.id)"
+                    >
+                        {{ parentNumber }}-{{ String(childIndex + 1).padStart(2, "0") }} {{ child.name }} ({{ child.count }})
+                    </button>
+                    <Link
+                        :href="`/documents/upload?category_id=${child.id}`"
+                        class="border-l px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider"
+                        :class="Number(filterCategory) === Number(child.id) ? 'border-white/40' : 'border-[#003366]/30'"
+                    >
+                        Upload
+                    </Link>
+                </div>
             </div>
 
             <SectionCard
@@ -271,6 +291,10 @@ const selectedParent = computed(() => {
     return props.categoryTree.find((cat) => Number(cat.id) === id)
         || props.categoryTree.find((cat) => (cat.children || []).some((child) => Number(child.id) === id))
         || null;
+});
+const parentNumber = computed(() => {
+    const index = props.categoryTree.findIndex((cat) => cat.id === selectedParent.value?.id);
+    return index >= 0 ? String(index + 1).padStart(2, "0") : "01";
 });
 
 const search = ref(props.filters.q ?? "");

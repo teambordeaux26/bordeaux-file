@@ -5,17 +5,16 @@
             <PageHeader
                 title="System Dashboard"
                 kicker="Overview"
-                subtitle="Monitor document status, visitor activity, and upcoming office events from a single command view."
+                subtitle="Office highlights, summary counts, and the calendar of meetings and deadlines."
             >
                 <template #actions>
-                    <Link href="/documents/upload" class="soft-button">Upload Document</Link>
-                    <button type="button" class="soft-button-light" @click="showEventForm = true">
+                    <button type="button" class="soft-button" @click="showEventForm = true">
                         Add Event
                     </button>
                 </template>
             </PageHeader>
 
-            <div class="grid gap-4 md:grid-cols-3">
+            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <StatCard
                     v-for="stat in stats"
                     :key="stat.label"
@@ -178,28 +177,9 @@
                 </SectionCard>
             </div>
 
-            <div class="grid gap-6 xl:grid-cols-2">
-                <SectionCard
-                    title="Quick Actions"
-                    eyebrow="Operations"
-                    subtitle="Jump into the most common office transactions."
-                >
-                    <div class="grid gap-2 sm:grid-cols-2">
-                        <Link
-                            v-for="action in quickActions"
-                            :key="action.label"
-                            :href="action.href"
-                            class="flex items-center justify-between border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-[#003366] hover:bg-[#003366] hover:text-white hover:border-[#003366] transition"
-                        >
-                            <span>{{ action.label }}</span>
-                            <span class="text-xs font-normal opacity-70">{{ action.note }}</span>
-                        </Link>
-                    </div>
-                </SectionCard>
-
-                <SectionCard
+            <SectionCard
                     title="Pending Reviews"
-                    eyebrow="Approvals"
+                    eyebrow="Highlights"
                     subtitle="Documents currently waiting for administrative action."
                 >
                     <p v-if="approvals.length === 0" class="text-sm text-slate-500 py-4 text-center">
@@ -221,32 +201,6 @@
                             <span class="soft-chip">{{ item.age }}</span>
                         </div>
                     </div>
-                </SectionCard>
-            </div>
-
-            <SectionCard
-                title="Recent Activity"
-                eyebrow="Audit Trail"
-                subtitle="Latest document movements and visitor actions."
-            >
-                <p v-if="activity.length === 0" class="text-sm text-slate-500 py-4 text-center">
-                    No recent activity recorded.
-                </p>
-                <div v-else class="space-y-2">
-                    <div
-                        v-for="entry in activity"
-                        :key="entry.summary + entry.time"
-                        class="flex flex-wrap items-center justify-between gap-3 border border-gray-200 bg-white px-4 py-3"
-                    >
-                        <div>
-                            <p class="text-sm font-bold text-gray-900">{{ entry.summary }}</p>
-                            <p class="text-xs text-gray-500 mt-0.5">{{ entry.detail }}</p>
-                        </div>
-                        <span class="text-xs uppercase tracking-widest text-gray-400 font-semibold">
-                            {{ entry.time }}
-                        </span>
-                    </div>
-                </div>
             </SectionCard>
         </div>
 
@@ -360,17 +314,9 @@ import SectionCard from "../Components/SectionCard.vue";
 const props = defineProps({
     stats:     { type: Array, default: () => [] },
     approvals: { type: Array, default: () => [] },
-    activity:  { type: Array, default: () => [] },
     calendar:  { type: Object, required: true },
     reminders: { type: Array, default: () => [] },
 });
-
-const quickActions = [
-    { label: "Log Visitor",          note: "Front desk", href: "/visitors" },
-    { label: "Generate Certificate", note: "COA module", href: "/certificates" },
-    { label: "Workflow Board",       note: "Stages",     href: "/workflow" },
-    { label: "Returned Documents",   note: "Revisions",  href: "/documents/returned" },
-];
 
 const reminderPageSize = 5;
 const reminderPage = ref(1);

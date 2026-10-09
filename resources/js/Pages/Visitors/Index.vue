@@ -25,12 +25,23 @@
                         <p v-if="form.errors.visitor_name" class="mt-1 text-xs text-red-600">{{ form.errors.visitor_name }}</p>
                     </div>
                     <div>
-                        <label class="text-xs uppercase tracking-[0.3em] text-slate-500">Contact Number</label>
+                        <label class="text-xs uppercase tracking-[0.3em] text-slate-500">Contact Number <span class="normal-case tracking-normal text-gray-400">(optional)</span></label>
                         <input
                             v-model="form.visitor_phone"
                             class="soft-input mt-2"
-                            placeholder="Phone number"
+                            placeholder="Phone number, if available"
                         />
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="text-xs uppercase tracking-[0.3em] text-slate-500">Email <span class="normal-case tracking-normal text-gray-400">(optional)</span></label>
+                        <input
+                            v-model="form.visitor_email"
+                            type="email"
+                            class="soft-input mt-2"
+                            placeholder="Send a copy of this visit if an email is available"
+                        />
+                        <p class="mt-1 text-xs text-gray-500">Leave this blank for walk-in visitors, including senior citizens without a phone or email.</p>
+                        <p v-if="form.errors.visitor_email" class="mt-1 text-xs text-red-600">{{ form.errors.visitor_email }}</p>
                     </div>
                     <div class="md:col-span-2">
                         <label class="text-xs uppercase tracking-[0.3em] text-slate-500">Barangay (Oas, Albay)</label>
@@ -82,6 +93,7 @@
                             <p class="text-xs text-slate-500">{{ visitor.purpose }}</p>
                             <p v-if="visitor.address !== '—'" class="text-xs text-slate-400">{{ visitor.address }}</p>
                             <p v-if="visitor.contact !== '—'" class="text-xs text-slate-400">{{ visitor.contact }}</p>
+                            <p v-if="visitor.email && visitor.email !== '—'" class="text-xs text-slate-400">{{ visitor.email }}</p>
                         </div>
                         <div class="text-right text-xs text-slate-500">
                             <p>Time In: {{ visitor.timeIn }}</p>
@@ -92,6 +104,33 @@
                         </div>
                     </div>
                 </div>
+            </SectionCard>
+
+            <SectionCard
+                title="Previous Visitor Records"
+                eyebrow="History"
+                subtitle="Visits recorded before today."
+            >
+                <p v-if="!previousRows.length" class="text-sm text-slate-500 py-4 text-center">No previous visitor records.</p>
+                <div v-else class="space-y-3">
+                    <div
+                        v-for="visitor in previousRows"
+                        :key="visitor.id"
+                        class="card-shell flex flex-wrap items-center justify-between gap-4 px-4 py-3"
+                    >
+                        <div>
+                            <p class="text-sm font-semibold text-slate-900">{{ visitor.name }}</p>
+                            <p class="text-xs text-slate-500">{{ visitor.purpose }}</p>
+                            <p v-if="visitor.address !== '—'" class="text-xs text-slate-400">{{ visitor.address }}</p>
+                            <p v-if="visitor.email && visitor.email !== '—'" class="text-xs text-slate-400">{{ visitor.email }}</p>
+                        </div>
+                        <div class="text-right text-xs text-slate-500">
+                            <p>{{ visitor.when }}</p>
+                            <p>Time in: {{ visitor.timeIn }}</p>
+                        </div>
+                    </div>
+                </div>
+                <Pagination :paginator="previous" />
             </SectionCard>
 
             <ReportPanel
@@ -114,20 +153,24 @@ import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
 import SearchableSelect from "../../Components/SearchableSelect.vue";
+import Pagination from "../../Components/Pagination.vue";
 import ReportPanel from "../../Components/ReportPanel.vue";
 
 const props = defineProps({
     visitors: { type: Array, default: () => [] },
+    previous: { type: Object, default: () => ({ data: [] }) },
     report: { type: Object, default: () => ({ stats: [], breakdown: [], period: "monthly" }) },
     reportRange: { type: String, default: "" },
 });
 
+const previousRows = computed(() => props.previous?.data ?? []);
 const page = usePage();
 const barangays = computed(() => page.props.oasBarangays ?? []);
 
 const form = useForm({
     visitor_name:  '',
     visitor_phone: '',
+    visitor_email: '',
     address:       '',
     purpose:       '',
 });

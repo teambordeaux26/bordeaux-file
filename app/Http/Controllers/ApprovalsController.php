@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Document;
+use App\Support\OfficeTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -16,8 +17,9 @@ class ApprovalsController extends Controller
             ->visibleTo(Auth::user())
             ->whereIn('status', ['pending', 'under_review'])
             ->latest()
-            ->get()
-            ->map(fn($d) => [
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn ($d) => [
                 'id'       => $d->id,
                 'tracking' => $d->tracking_number,
                 'title'    => $d->title,
@@ -25,7 +27,7 @@ class ApprovalsController extends Controller
                 'owner'    => $d->submitter?->name ?? '—',
                 'handler'  => $d->handler?->name ?? 'Unassigned',
                 'priority' => $d->priority,
-                'age'      => $d->created_at->diffForHumans(),
+                'age'      => OfficeTime::exact($d->created_at),
             ]);
 
         return Inertia::render('Approvals/Index', compact('documents'));

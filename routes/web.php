@@ -90,6 +90,7 @@ Route::middleware(['auth', 'role:admin,employee', 'employee.page'])->group(funct
 
     // Archive
     Route::get('/archive', [ArchiveController::class, 'index'])->name('archive.index');
+    Route::get('/archive/reports/export', [ArchiveController::class, 'exportReport'])->name('archive.reports');
 
     // Workflow (visible to admin + employees; per-action rules are enforced in the controller)
     Route::get('/workflow',                     [WorkflowController::class, 'index'])->name('workflow.index');
@@ -106,7 +107,6 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/departments',                 [DepartmentController::class, 'index'])->name('departments.index');
     Route::post('/departments',                [DepartmentController::class, 'store'])->name('departments.store');
     Route::put('/departments/{department}',    [DepartmentController::class, 'update'])->name('departments.update');
-    Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
 
     // Approvals
     Route::get('/approvals',                             [ApprovalsController::class, 'index'])->name('approvals.index');
@@ -123,6 +123,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
     // Audit
     Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
+    Route::get('/audit/reports/export', [AuditController::class, 'exportReport'])->name('audit.reports');
 
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
@@ -137,6 +138,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 Route::get('/get-documents', [PublicDocumentController::class, 'index'])->name('get-documents.index');
 Route::get('/get-documents/{document}', [PublicDocumentController::class, 'show'])->name('get-documents.show');
 Route::get('/get-documents/{document}/file', [PublicDocumentController::class, 'file'])->name('get-documents.file');
+Route::get('/requests/qr', [RequestController::class, 'qr'])->name('requests.qr');
 Route::get('/requests/new',    [RequestController::class, 'create'])->name('requests.create');
 Route::post('/requests',       [RequestController::class, 'store'])->name('requests.store');
 Route::get('/requests/status', [RequestController::class, 'status'])->name('requests.status');

@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Document;
+use App\Models\DocumentCategory;
 use App\Models\SystemSetting;
 use App\Support\OasBarangays;
 use App\Support\RequestNotifications;
@@ -82,6 +83,22 @@ class HandleInertiaRequests extends Middleware
             'oasBarangays' => fn () => OasBarangays::options(),
             'returnedCount' => fn () => $this->returnedCountFor($request),
             'requestNotifications' => fn () => RequestNotifications::forUser($request->user()),
+            'documentFolders' => fn () => $request->user()
+                ? DocumentCategory::query()
+                    ->whereNull('parent_id')
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get()
+                    ->values()
+                    ->map(fn (DocumentCategory $category, int $index) => [
+                        'id' => $category->id,
+                        'name' => $category->name,
+                        'number' => str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
+                        'href' => '/documents?category_id='.$category->id,
+                        'upload_href' => '/documents/upload?category_id='.$category->id,
+                    ])
+                    ->all()
+                : [],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),

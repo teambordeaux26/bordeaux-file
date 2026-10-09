@@ -51,7 +51,7 @@
                     </p>
 
                     <p
-                        v-else-if="results.length === 0"
+                        v-else-if="rows.length === 0"
                         class="text-sm text-gray-500 text-center py-8"
                     >
                         No documents found for "{{ filters.q }}". Try a different keyword.
@@ -59,11 +59,11 @@
 
                     <template v-else>
                         <p class="text-xs text-gray-400">
-                            {{ results.length }} document(s) found.
+                            {{ results.total ?? rows.length }} document(s) found.
                         </p>
 
                         <div
-                            v-for="doc in results"
+                            v-for="doc in rows"
                             :key="doc.id"
                             class="border border-gray-200 bg-gray-50 px-4 py-4 flex flex-wrap items-center justify-between gap-4"
                         >
@@ -90,6 +90,7 @@
                             </div>
                         </div>
                     </template>
+                    <Pagination v-if="results.links" :paginator="results" />
                 </div>
             </div>
         </div>
@@ -97,15 +98,18 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { Head, Link, router } from "@inertiajs/vue3";
 import GuestLayout from "../../Layouts/GuestLayout.vue";
+import Pagination from "../../Components/Pagination.vue";
 
 const props = defineProps({
-    results:  { type: Array, default: () => [] },
+    results:  { type: [Array, Object], default: () => [] },
     filters:  { type: Object, default: () => ({ q: "" }) },
     searched: { type: Boolean, default: false },
 });
+
+const rows = computed(() => props.results?.data ?? props.results ?? []);
 
 const q = ref(props.filters.q ?? "");
 

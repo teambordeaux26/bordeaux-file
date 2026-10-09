@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\DocumentStatusUpdate;
+use App\Support\OfficeTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -127,7 +128,7 @@ class WorkflowController extends Controller
                 'handler'      => $d->handler?->name,
                 'handler_id'   => $d->handled_by,
                 'priority'     => $d->priority,
-                'updated'      => optional($d->updated_at)->diffForHumans(),
+                'updated'      => OfficeTime::exact($d->updated_at),
                 'updated_ts'   => optional($d->updated_at)->timestamp,
                 'view_url'     => route('documents.show', $d->id),
                 'has_file'     => (bool) $d->file_path,
@@ -156,9 +157,27 @@ class WorkflowController extends Controller
             ];
         }
 
+        $restored = Document::with(['category.parent', 'submitter', 'restorer'])
+            ->visibleTo($user)
+            ->whereNotNull('restored_at')
+            ->latest('restored_at')
+            ->get()
+            ->map(fn (Document $document) => [
+                'id' => $document->id,
+                'tracking' => $document->tracking_number,
+                'title' => $document->title,
+                'category' => $document->category?->label() ?? '—',
+                'owner' => $document->submitter?->name ?? '—',
+                'view_url' => route('documents.show', $document->id),
+                'summary' => 'File '.$document->tracking_number.' was restored on '
+                    .OfficeTime::exact($document->restored_at)
+                    .' by '.($document->restorer?->name ?? 'a staff member').'.',
+            ]);
+
         return Inertia::render('Workflow/Index', [
             'stages'     => $stageMeta,
             'documents'  => $grouped,
+            'restored'   => $restored,
             'legend'     => static::legend(),
             'currentUser'=> [
                 'id'   => $user->id,

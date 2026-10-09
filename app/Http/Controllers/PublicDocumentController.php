@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Models\DocumentCategory;
 use App\Models\SystemSetting;
+use App\Support\TextSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -37,7 +38,7 @@ class PublicDocumentController extends Controller
                 $this->applyPublicSearch($builder, $q, $settings);
             });
 
-            $results = $query->latest()->get()->map(fn ($document) => [
+            $results = $query->latest()->paginate(10)->withQueryString()->through(fn ($document) => [
                 'id'           => $document->id,
                 'tracking'     => $document->tracking_number,
                 'title'        => $document->title,
@@ -49,7 +50,7 @@ class PublicDocumentController extends Controller
                     ?? $document->updated_at->format('M d, Y'),
                 'view_url'     => route('get-documents.show', $document->id),
                 'download_url' => route('get-documents.file', $document->id),
-            ])->all();
+            ]);
         }
 
         return Inertia::render('Documents/GetDocuments', [
@@ -113,21 +114,25 @@ class PublicDocumentController extends Controller
         foreach ($fields as $field) {
             if ($field === 'category') {
                 $method = $first ? 'whereHas' : 'orWhereHas';
-                $builder->{$method}('category', fn ($categoryQuery) => $categoryQuery
-                    ->where('name', 'like', "%{$q}%")
-                    ->orWhere('description', 'like', "%{$q}%")
-                    ->orWhereHas('parent', fn ($parentQuery) => $parentQuery->where('name', 'like', "%{$q}%")));
+                $builder->{$method}('category', function ($categoryQuery) use ($q) {
+                    TextSearch::contains($categoryQuery, 'name', $q);
+                    TextSearch::contains($categoryQuery, 'description', $q, true);
+                    $categoryQuery->orWhereHas('parent', fn ($parentQuery) => TextSearch::contains($parentQuery, 'name', $q));
+                });
                 $first = false;
                 continue;
             }
 
-            $method = $first ? 'where' : 'orWhere';
-            $builder->{$method}($field, 'like', "%{$q}%");
+            if (! in_array($field, ['title', 'tracking_number', 'reference_no', 'description'], true)) {
+                continue;
+            }
+
+            TextSearch::contains($builder, $field, $q, ! $first);
             $first = false;
         }
 
         if ($first) {
-            $builder->where('title', 'like', "%{$q}%");
+            TextSearch::contains($builder, 'title', $q);
         }
     }
 

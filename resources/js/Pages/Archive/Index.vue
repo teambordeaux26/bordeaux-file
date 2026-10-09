@@ -158,6 +158,16 @@
                     <Pagination :paginator="archives" />
                 </div>
             </SectionCard>
+
+            <ReportPanel
+                title="Archive Reports"
+                subtitle="Choose a period, then export archived and restored document activity."
+                :period="report.period"
+                :range="reportRange"
+                :report="report"
+                export-base="/archive/reports/export"
+                @generate="applyReport"
+            />
         </div>
     </AppLayout>
 </template>
@@ -169,6 +179,7 @@ import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
 import Pagination from "../../Components/Pagination.vue";
+import ReportPanel from "../../Components/ReportPanel.vue";
 
 const props = defineProps({
     archives: { type: Object, default: () => ({ data: [], total: 0 }) },
@@ -180,6 +191,8 @@ const props = defineProps({
         type: Object,
         default: () => ({ q: "", category_id: "", retention_days: "", year: "" }),
     },
+    report: { type: Object, default: () => ({ stats: [], breakdown: [], period: "" }) },
+    reportRange: { type: String, default: "" },
 });
 
 const rows = computed(() => props.archives?.data ?? []);
@@ -215,13 +228,29 @@ onBeforeUnmount(() => {
     if (searchTimer) clearTimeout(searchTimer);
 });
 
-function applyFilters() {
-    router.get("/archive", {
+function listQuery(extra = {}) {
+    return {
         q: search.value || undefined,
         category_id: filterCategory.value || undefined,
         retention_days: filterRetention.value || undefined,
         year: filterYear.value || undefined,
-    }, { preserveState: true, preserveScroll: true, replace: true });
+        report_period: props.report.period || undefined,
+        report_from: props.report.from || undefined,
+        report_to: props.report.to || undefined,
+        ...extra,
+    };
+}
+
+function applyFilters() {
+    router.get("/archive", listQuery(), { preserveState: true, preserveScroll: true, replace: true });
+}
+
+function applyReport({ period, from, to }) {
+    router.get("/archive", listQuery({
+        report_period: period,
+        report_from: from,
+        report_to: to,
+    }), { preserveState: true, preserveScroll: true, replace: true });
 }
 
 function clearFilters() {

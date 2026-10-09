@@ -17,12 +17,12 @@
                 eyebrow="Action Required"
                 subtitle="Documents awaiting administrative approval or return."
             >
-                <p v-if="documents.length === 0" class="text-sm text-slate-500 py-4 text-center">
+                <p v-if="rows.length === 0" class="text-sm text-slate-500 py-4 text-center">
                     No documents pending review.
                 </p>
                 <div v-else class="space-y-4">
                     <div
-                        v-for="item in documents"
+                        v-for="item in rows"
                         :key="item.id"
                         class="card-shell flex flex-wrap items-center justify-between gap-4 px-4 py-4"
                     >
@@ -67,21 +67,25 @@
                         </div>
                     </div>
                 </div>
+                <Pagination :paginator="documents" />
             </SectionCard>
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { Head, router } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
+import Pagination from "../../Components/Pagination.vue";
 
-defineProps({
-    documents: { type: Array, default: () => [] },
+const props = defineProps({
+    documents: { type: Object, default: () => ({ data: [] }) },
 });
+
+const rows = computed(() => props.documents?.data ?? []);
 
 const processing = ref(null);
 

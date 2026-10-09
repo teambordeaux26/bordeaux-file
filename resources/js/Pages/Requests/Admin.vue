@@ -43,7 +43,7 @@
                 </p>
 
                 <div
-                    v-for="req in filtered"
+                    v-for="req in paged"
                     :key="req.id"
                     class="card-shell"
                 >
@@ -164,6 +164,14 @@
                             </div>
                         </div>
                     </Transition>
+                </div>
+
+                <div v-if="filtered.length > pageSize" class="flex items-center justify-between gap-3 pt-2 text-xs text-gray-600">
+                    <p>Page {{ pageNumber }} of {{ pageCount }}</p>
+                    <div class="flex gap-2">
+                        <button type="button" class="soft-button-light" :disabled="pageNumber <= 1" @click="pageNumber--">Previous</button>
+                        <button type="button" class="soft-button-light" :disabled="pageNumber >= pageCount" @click="pageNumber++">Next</button>
+                    </div>
                 </div>
             </div>
 
@@ -336,6 +344,24 @@ const filtered = computed(() =>
         ? props.requests
         : props.requests.filter(r => r.status === activeTab.value)
 );
+
+const pageSize = 8;
+const pageNumber = ref(1);
+const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)));
+const paged = computed(() => {
+    const start = (pageNumber.value - 1) * pageSize;
+    return filtered.value.slice(start, start + pageSize);
+});
+
+watch(activeTab, () => {
+    pageNumber.value = 1;
+});
+
+watch(filtered, () => {
+    if (pageNumber.value > pageCount.value) {
+        pageNumber.value = pageCount.value;
+    }
+});
 
 const isCertificateRequest = computed(
     () => Boolean(completeTarget.value?.issues_certificate)

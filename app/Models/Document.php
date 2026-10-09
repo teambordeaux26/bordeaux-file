@@ -30,6 +30,8 @@ class Document extends Model
         'approved_at',
         'returned_at',
         'archived_at',
+        'restored_at',
+        'restored_by',
         'submitted_at',
         'released_at',
     ];
@@ -38,6 +40,7 @@ class Document extends Model
         'approved_at'  => 'datetime',
         'returned_at'  => 'datetime',
         'archived_at'  => 'datetime',
+        'restored_at'  => 'datetime',
         'expires_at'   => 'datetime',
         'submitted_at' => 'datetime',
         'released_at'  => 'datetime',
@@ -61,6 +64,11 @@ class Document extends Model
     public function handler(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by');
+    }
+
+    public function restorer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'restored_by');
     }
 
     public function allowedUsers(): BelongsToMany

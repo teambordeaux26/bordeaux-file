@@ -15,10 +15,10 @@
             <SectionCard
                 title="Awaiting Your Revision"
                 eyebrow="Action Required"
-                :subtitle="documents.length + ' document(s) to address.'"
+                :subtitle="(documents.total ?? documents.length ?? 0) + ' document(s) to address.'"
             >
                 <p
-                    v-if="documents.length === 0"
+                    v-if="rows.length === 0"
                     class="text-sm text-slate-500 py-6 text-center"
                 >
                     You have no returned documents. Great work.
@@ -26,7 +26,7 @@
 
                 <div v-else class="space-y-4">
                     <div
-                        v-for="doc in documents"
+                        v-for="doc in rows"
                         :key="doc.id"
                         class="border border-gray-200 bg-white p-4 shadow-sm"
                     >
@@ -94,20 +94,25 @@
                         </div>
                     </div>
                 </div>
+                <Pagination :paginator="documents" />
             </SectionCard>
         </div>
     </AppLayout>
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { Head, Link } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
+import Pagination from "../../Components/Pagination.vue";
 
-defineProps({
-    documents: { type: Array, default: () => [] },
+const props = defineProps({
+    documents: { type: Object, default: () => ({ data: [] }) },
 });
+
+const rows = computed(() => props.documents?.data ?? []);
 
 function priorityClass(priority) {
     if (priority === "Urgent") return "bg-red-100 text-red-700";

@@ -9,6 +9,7 @@ use App\Models\DocumentRequest;
 use App\Models\User;
 use App\Models\VisitorLog;
 use App\Support\DocumentStatus;
+use App\Support\TextSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -129,11 +130,11 @@ class SearchController extends Controller
                     ->orWhere('signer_name', 'like', "%{$q}%")
                     ->orWhere('signer_title', 'like', "%{$q}%")
                     ->orWhereHas('visitorLog', function (Builder $visitorQuery) use ($q) {
-                        $visitorQuery->where('visitor_name', 'like', "%{$q}%")
-                            ->orWhere('visitor_email', 'like', "%{$q}%")
-                            ->orWhere('visitor_phone', 'like', "%{$q}%")
-                            ->orWhere('purpose', 'like', "%{$q}%")
-                            ->orWhere('address', 'like', "%{$q}%");
+                        TextSearch::contains($visitorQuery, 'visitor_name', $q);
+                        TextSearch::contains($visitorQuery, 'visitor_email', $q, true);
+                        TextSearch::contains($visitorQuery, 'visitor_phone', $q, true);
+                        TextSearch::contains($visitorQuery, 'purpose', $q, true);
+                        TextSearch::addressStartsWith($visitorQuery, 'address', $q, true);
                     })
                     ->orWhereHas('issuer', function (Builder $userQuery) use ($q) {
                         $userQuery->where('name', 'like', "%{$q}%")
@@ -166,11 +167,11 @@ class SearchController extends Controller
     {
         return VisitorLog::query()
             ->where(function (Builder $builder) use ($q) {
-                $builder->where('visitor_name', 'like', "%{$q}%")
-                    ->orWhere('visitor_email', 'like', "%{$q}%")
-                    ->orWhere('visitor_phone', 'like', "%{$q}%")
-                    ->orWhere('purpose', 'like', "%{$q}%")
-                    ->orWhere('address', 'like', "%{$q}%");
+                TextSearch::contains($builder, 'visitor_name', $q);
+                TextSearch::contains($builder, 'visitor_email', $q, true);
+                TextSearch::contains($builder, 'visitor_phone', $q, true);
+                TextSearch::contains($builder, 'purpose', $q, true);
+                TextSearch::addressStartsWith($builder, 'address', $q, true);
             })
             ->latest('time_in')
             ->limit($limit)
@@ -180,6 +181,7 @@ class SearchController extends Controller
                 'type'      => 'Visitor',
                 'title'     => $visitor->visitor_name,
                 'subtitle'  => implode(' · ', array_filter([
+                    $visitor->address,
                     $visitor->purpose,
                     $visitor->visitor_phone,
                     $visitor->time_in?->format('M d, Y g:i A'),
@@ -197,15 +199,15 @@ class SearchController extends Controller
 
         return DocumentRequest::query()
             ->where(function (Builder $builder) use ($q, $statusQuery) {
-                $builder->where('tracking_number', 'like', "%{$q}%")
-                    ->orWhere('requester_name', 'like', "%{$q}%")
-                    ->orWhere('requester_email', 'like', "%{$q}%")
-                    ->orWhere('requester_phone', 'like', "%{$q}%")
-                    ->orWhere('requester_address', 'like', "%{$q}%")
-                    ->orWhere('request_type', 'like', "%{$q}%")
-                    ->orWhere('details', 'like', "%{$q}%")
-                    ->orWhere('status', 'like', "%{$statusQuery}%")
-                    ->orWhereRaw("REPLACE(status, '_', ' ') LIKE ?", ["%{$q}%"]);
+                TextSearch::contains($builder, 'tracking_number', $q);
+                TextSearch::contains($builder, 'requester_name', $q, true);
+                TextSearch::contains($builder, 'requester_email', $q, true);
+                TextSearch::contains($builder, 'requester_phone', $q, true);
+                TextSearch::addressStartsWith($builder, 'requester_address', $q, true);
+                TextSearch::contains($builder, 'request_type', $q, true);
+                TextSearch::contains($builder, 'details', $q, true);
+                TextSearch::contains($builder, 'status', $statusQuery, true);
+                $builder->orWhereRaw("LOWER(REPLACE(status, '_', ' ')) LIKE ?", ['%'.mb_strtolower($q).'%']);
             })
             ->latest()
             ->limit($limit)

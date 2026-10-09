@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AuditLog;
 use App\Models\Document;
+use App\Models\DocumentRequest;
 use App\Models\OfficeEvent;
 use App\Models\VisitorLog;
+use App\Support\OfficeTime;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -39,6 +40,21 @@ class DashboardController extends Controller
                 'value' => VisitorLog::whereDate('time_in', today())->count(),
                 'note'  => 'Captured in the digital log.',
             ],
+            [
+                'label' => 'Incoming Requests',
+                'value' => DocumentRequest::where('status', 'pending')->count(),
+                'note'  => 'Citizen requests waiting for review.',
+            ],
+            [
+                'label' => 'Archived Files',
+                'value' => Document::query()->visibleTo($user)->where('status', 'archived')->count(),
+                'note'  => 'Stored for long-term retention.',
+            ],
+            [
+                'label' => 'Returned for Revision',
+                'value' => Document::query()->visibleTo($user)->where('status', 'returned')->count(),
+                'note'  => 'Sent back to the document owner.',
+            ],
         ];
 
         $approvals = Document::with(['category.parent', 'submitter', 'handler'])
@@ -53,17 +69,7 @@ class DashboardController extends Controller
                 'title'       => $d->title,
                 'submittedBy' => $d->submitter?->name ?? '—',
                 'handler'     => $d->handler?->name,
-                'age'         => $d->created_at->diffForHumans(),
-            ]);
-
-        $activity = AuditLog::with('user')
-            ->latest()
-            ->take(8)
-            ->get()
-            ->map(fn ($l) => [
-                'summary' => $l->action,
-                'detail'  => $l->description,
-                'time'    => $l->created_at->diffForHumans(),
+                'age'         => OfficeTime::exact($d->created_at),
             ]);
 
         $cursor = $this->calendarCursor($request->query('calendar'));
@@ -71,7 +77,6 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard', [
             'stats'      => $stats,
             'approvals'  => $approvals,
-            'activity'   => $activity,
             'calendar'   => $this->calendarPayload($cursor),
             'reminders'  => $this->reminders(),
         ]);

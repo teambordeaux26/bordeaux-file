@@ -8,43 +8,59 @@
                 {{ section.label }}
             </p>
             <div class="space-y-0.5">
-                <Link
-                    v-for="item in section.items"
-                    :key="item.href"
-                    :href="item.href"
-                    :title="collapsed ? item.label : undefined"
-                    class="flex items-center transition"
-                    :class="[
-                        collapsed
-                            ? 'justify-center px-2 py-2.5 rounded-md'
-                            : 'justify-between gap-2 px-3 py-2',
-                        isActive(item.href)
-                            ? collapsed
-                                ? 'bg-white/15 text-white'
-                                : 'bg-white/15 text-white font-bold border-l-4 border-[#FFD700]'
-                            : collapsed
-                              ? 'text-blue-200 hover:bg-white/10 hover:text-white border-l-4 border-transparent'
-                              : 'text-blue-200 hover:bg-white/10 hover:text-white font-medium border-l-4 border-transparent',
-                    ]"
-                >
-                    <span
-                        class="flex items-center min-w-0"
-                        :class="collapsed ? '' : 'gap-2.5'"
+                <div v-for="item in section.items" :key="item.href">
+                    <Link
+                        :href="item.href"
+                        :title="collapsed ? item.label : undefined"
+                        class="flex items-center transition"
+                        :class="[
+                            collapsed
+                                ? 'justify-center px-2 py-2.5 rounded-md'
+                                : 'justify-between gap-2 px-3 py-2',
+                            isActive(item.href)
+                                ? collapsed
+                                    ? 'bg-white/15 text-white'
+                                    : 'bg-white/15 text-white font-bold border-l-4 border-[#FFD700]'
+                                : collapsed
+                                  ? 'text-blue-200 hover:bg-white/10 hover:text-white border-l-4 border-transparent'
+                                  : 'text-blue-200 hover:bg-white/10 hover:text-white font-medium border-l-4 border-transparent',
+                        ]"
                     >
-                        <component
-                            :is="resolveIcon(item)"
-                            class="h-4 w-4 shrink-0"
-                            :stroke-width="2"
-                        />
-                        <span v-show="!collapsed" class="truncate">{{ item.label }}</span>
-                    </span>
-                    <span
-                        v-if="item.badge && !collapsed"
-                        class="bg-[#FFD700] text-[#003366] px-2 py-0.5 text-[10px] font-bold shrink-0"
+                        <span
+                            class="flex items-center min-w-0"
+                            :class="collapsed ? '' : 'gap-2.5'"
+                        >
+                            <component
+                                :is="resolveIcon(item)"
+                                class="h-4 w-4 shrink-0"
+                                :stroke-width="2"
+                            />
+                            <span v-show="!collapsed" class="truncate">{{ item.label }}</span>
+                        </span>
+                        <span
+                            v-if="item.badge && !collapsed"
+                            class="bg-[#FFD700] text-[#003366] px-2 py-0.5 text-[10px] font-bold shrink-0"
+                        >
+                            {{ item.badge }}
+                        </span>
+                    </Link>
+                    <div
+                        v-if="item.children?.length && !collapsed"
+                        class="ml-6 border-l border-white/15"
                     >
-                        {{ item.badge }}
-                    </span>
-                </Link>
+                        <Link
+                            v-for="child in item.children"
+                            :key="child.href"
+                            :href="child.href"
+                            class="block truncate px-3 py-1.5 text-[11px] transition"
+                            :class="isActive(child.href)
+                                ? 'text-[#FFD700] font-bold'
+                                : 'text-blue-200 hover:text-white'"
+                        >
+                            {{ child.label }}
+                        </Link>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -67,31 +83,49 @@ const props = defineProps({
 });
 
 const page = usePage();
-const currentPath = computed(() => (page.url || "").split("?")[0]);
+const currentUrl = computed(() => page.url || "");
+const currentPath = computed(() => currentUrl.value.split("?")[0]);
 
 const allHrefs = computed(() =>
     props.sections.flatMap((section) =>
-        (section.items || []).map((item) => item.href).filter(Boolean)
+        (section.items || []).flatMap((item) => [
+            item.href,
+            ...(item.children || []).map((child) => child.href),
+        ]).filter(Boolean)
     )
 );
 
 const isActive = (href) => {
     const path = currentPath.value;
+    const [itemPath, itemQuery] = String(href).split("?");
+
+    if (itemQuery) {
+        const params = new URLSearchParams(currentUrl.value.split("?")[1] || "");
+        const expected = new URLSearchParams(itemQuery);
+        return path === itemPath && [...expected.entries()].every(([key, value]) => params.get(key) === value);
+    }
 
     if (href === "/dashboard") {
         return path === href || path === "/";
     }
 
-    // Prefer the longest matching nav href so /documents/returned
-    // does not also highlight /documents.
-    const matches = allHrefs.value.filter(
+    if (itemPath === "/documents") {
+        const params = new URLSearchParams(currentUrl.value.split("?")[1] || "");
+        if (params.get("category_id")) return false;
+    }
+
+    const pathHrefs = allHrefs.value
+        .map((candidate) => candidate.split("?")[0])
+        .filter((candidate, index, list) => list.indexOf(candidate) === index);
+
+    const matches = pathHrefs.filter(
         (candidate) => path === candidate || path.startsWith(`${candidate}/`)
     );
 
     if (matches.length === 0) return false;
 
     const best = matches.reduce((a, b) => (a.length >= b.length ? a : b));
-    return best === href;
+    return best === itemPath;
 };
 
 function resolveIcon(item) {

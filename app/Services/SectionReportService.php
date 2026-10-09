@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
 use App\Models\Certificate;
 use App\Models\Document;
 use App\Models\VisitorLog;
+use App\Services\DocumentRetentionService;
 use App\Support\DocumentStatus;
 use App\Support\ReportPeriod;
 use Carbon\Carbon;
@@ -236,6 +238,107 @@ class SectionReportService
                 'address' => $cert->visitorLog?->address ?? '—',
                 'purpose' => $cert->visitorLog?->purpose ?? '—',
                 'issuer'  => $cert->signer_name ?: ($cert->issuer?->name ?? '—'),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array{period: string, label: string, stats: list<array{label: string, value: int|string}>, breakdown: list<array{label: string, value: int}>}
+     */
+    public function archive(Carbon $start, Carbon $end, string $period): array
+    {
+        $archived = Document::whereBetween('archived_at', [$start, $end])->count();
+        $restored = Document::whereBetween('restored_at', [$start, $end])->count();
+
+        $byCategory = Document::with('category.parent')
+            ->whereBetween('archived_at', [$start, $end])
+            ->get()
+            ->groupBy(fn (Document $doc) => $doc->category?->label() ?? 'Uncategorized')
+            ->map(fn (Collection $group) => $group->count())
+            ->sortDesc();
+
+        return [
+            'period' => $period,
+            'from' => $start->toDateString(),
+            'to' => $end->toDateString(),
+            'label' => $this->periodTitle($period, 'archive activity'),
+            'stats' => [
+                ['label' => 'Archived', 'value' => $archived],
+                ['label' => 'Restored', 'value' => $restored],
+            ],
+            'breakdown' => $byCategory->map(fn ($value, $label) => [
+                'label' => $label,
+                'value' => $value,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
+    public function archiveRows(Carbon $start, Carbon $end): array
+    {
+        return Document::with(['category.parent', 'submitter'])
+            ->whereBetween('archived_at', [$start, $end])
+            ->orderBy('archived_at')
+            ->get()
+            ->map(fn (Document $doc) => [
+                'archived' => $doc->archived_at?->format('Y-m-d H:i') ?? '—',
+                'tracking' => $doc->tracking_number,
+                'title' => $doc->title,
+                'category' => $doc->category?->label() ?? '—',
+                'retention' => $doc->retention_days
+                    ? DocumentRetentionService::formatRetention($doc->retention_days)
+                    : '—',
+                'owner' => $doc->submitter?->name ?? '—',
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array{period: string, label: string, stats: list<array{label: string, value: int|string}>, breakdown: list<array{label: string, value: int}>}
+     */
+    public function audit(Carbon $start, Carbon $end, string $period): array
+    {
+        $logs = AuditLog::query()->whereBetween('created_at', [$start, $end]);
+        $total = (clone $logs)->count();
+        $byAction = (clone $logs)
+            ->selectRaw('action, COUNT(*) as aggregate')
+            ->groupBy('action')
+            ->orderByDesc('aggregate')
+            ->pluck('aggregate', 'action');
+
+        return [
+            'period' => $period,
+            'from' => $start->toDateString(),
+            'to' => $end->toDateString(),
+            'label' => $this->periodTitle($period, 'audit trail'),
+            'stats' => [
+                ['label' => 'Recorded activities', 'value' => $total],
+                ['label' => 'Action types', 'value' => $byAction->count()],
+            ],
+            'breakdown' => $byAction->map(fn ($value, $label) => [
+                'label' => $label,
+                'value' => (int) $value,
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
+    public function auditRows(Carbon $start, Carbon $end): array
+    {
+        return AuditLog::with('user')
+            ->whereBetween('created_at', [$start, $end])
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (AuditLog $log) => [
+                'when' => $log->created_at?->format('Y-m-d H:i') ?? '—',
+                'action' => $log->action,
+                'detail' => $log->description ?? '—',
+                'user' => $log->user?->name ?? 'System',
+                'ip' => $log->ip_address ?? '—',
             ])
             ->all();
     }
