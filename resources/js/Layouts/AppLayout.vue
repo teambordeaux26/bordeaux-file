@@ -2,7 +2,7 @@
     <div class="h-screen flex overflow-hidden bg-[#f5f5f5] font-sans">
         <!-- Fixed Sidebar -->
         <aside
-            class="flex-shrink-0 flex flex-col bg-[#003366] h-full transition-[width] duration-300 ease-in-out overflow-hidden"
+            class="relative z-40 flex-shrink-0 flex flex-col bg-[#003366] h-full transition-[width] duration-300 ease-in-out overflow-hidden"
             :class="collapsed ? 'w-[4.5rem]' : 'w-64'"
         >
             <!-- Branding -->
