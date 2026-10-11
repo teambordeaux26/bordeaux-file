@@ -27,7 +27,6 @@
                             :title="collapsed ? item.label : undefined"
                             class="flex min-w-0 flex-1 items-center transition"
                             :class="collapsed ? 'justify-center px-2 py-2.5' : 'justify-between gap-2 px-3 py-2'"
-                            @click="onItemClick($event, item)"
                         >
                             <span
                                 class="flex items-center min-w-0"
@@ -51,78 +50,44 @@
                             v-if="item.children?.length && !collapsed"
                             type="button"
                             class="shrink-0 px-2 text-blue-200 hover:text-white"
-                            :class="isDrawerOpen(item) ? 'text-[#FFD700]' : ''"
-                            :aria-expanded="isDrawerOpen(item)"
-                            :aria-label="`Open ${item.label} folders`"
-                            @click="toggleDrawer(item)"
+                            :aria-expanded="isOpen(item)"
+                            :aria-label="isOpen(item) ? `Hide ${item.label} folders` : `Show ${item.label} folders`"
+                            @click="toggle(item)"
                         >
                             <ChevronRight
                                 class="h-4 w-4 transition-transform"
-                                :class="isDrawerOpen(item) ? 'rotate-90' : ''"
+                                :class="isOpen(item) ? 'rotate-90' : ''"
                                 :stroke-width="2.25"
                             />
                         </button>
+                    </div>
+                    <div
+                        v-if="item.children?.length && isOpen(item) && !collapsed"
+                        class="ml-6 border-l border-white/15"
+                    >
+                        <Link
+                            v-for="child in item.children"
+                            :key="child.href"
+                            :href="child.href"
+                            :title="child.label"
+                            class="block px-3 py-1.5 text-[11px] leading-snug transition"
+                            :class="isActive(child.href)
+                                ? 'font-bold text-[#FFD700]'
+                                : 'text-blue-200 hover:text-white'"
+                        >
+                            {{ child.label }}
+                        </Link>
                     </div>
                 </div>
             </div>
         </div>
     </nav>
-
-    <Teleport to="body">
-        <div v-if="drawerItem">
-            <button
-                type="button"
-                class="fixed bottom-0 right-0 top-0 z-30 bg-black/40"
-                :style="{ left: sidebarOffset }"
-                aria-label="Close folders"
-                @click="closeDrawer"
-            />
-            <aside
-                class="fixed bottom-0 top-0 z-40 flex w-80 flex-col border-l border-white/15 bg-[#003366] shadow-xl"
-                :style="{ left: sidebarOffset }"
-            >
-                <div class="flex items-start justify-between gap-3 border-b border-white/15 px-4 py-4">
-                    <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-widest text-blue-300">Folders</p>
-                        <h2 class="text-sm font-bold text-white">{{ drawerItem.label }}</h2>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex h-8 w-8 items-center justify-center border border-white/20 text-blue-100 hover:bg-white/10"
-                        aria-label="Close"
-                        @click="closeDrawer"
-                    >
-                        <X class="h-4 w-4" :stroke-width="2.25" />
-                    </button>
-                </div>
-                <nav class="flex-1 overflow-y-auto px-3 py-3">
-                    <Link
-                        :href="drawerItem.href"
-                        class="mb-2 block border border-white/15 px-3 py-2 text-sm font-semibold transition"
-                        :class="isActive(drawerItem.href) ? 'bg-white/15 text-[#FFD700]' : 'text-blue-100 hover:bg-white/10 hover:text-white'"
-                        @click="closeDrawer"
-                    >
-                        All documents
-                    </Link>
-                    <Link
-                        v-for="child in drawerItem.children"
-                        :key="child.href"
-                        :href="child.href"
-                        class="block px-3 py-2.5 text-sm leading-snug transition"
-                        :class="isActive(child.href) ? 'bg-white/15 font-bold text-[#FFD700]' : 'text-blue-100 hover:bg-white/10 hover:text-white'"
-                    >
-                        {{ child.label }}
-                    </Link>
-                </nav>
-            </aside>
-        </div>
-    </Teleport>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { Link, usePage } from "@inertiajs/vue3";
-import { ChevronRight, X } from "@lucide/vue";
+import { ChevronRight } from "@lucide/vue";
 import { navIconByHref, navIconMap } from "../lib/navIcons.js";
 
 const props = defineProps({
@@ -137,58 +102,8 @@ const props = defineProps({
 });
 
 const page = usePage();
-const drawerHref = ref(null);
+const openHref = ref(null);
 const currentUrl = computed(() => page.url || "");
-const sidebarOffset = computed(() => (props.collapsed ? "4.5rem" : "16rem"));
-
-const drawerItem = computed(() => {
-    for (const section of props.sections) {
-        const match = (section.items || []).find((item) => item.href === drawerHref.value && item.children?.length);
-        if (match) return match;
-    }
-
-    return null;
-});
-
-function isDrawerOpen(item) {
-    return drawerHref.value === item.href;
-}
-
-function rowActive(item) {
-    return isActive(item.href)
-        || isDrawerOpen(item)
-        || (item.children || []).some((child) => isActive(child.href));
-}
-
-function toggleDrawer(item) {
-    drawerHref.value = isDrawerOpen(item) ? null : item.href;
-}
-
-function closeDrawer() {
-    drawerHref.value = null;
-}
-
-function onItemClick(event, item) {
-    if (props.collapsed && item.children?.length) {
-        event.preventDefault();
-        toggleDrawer(item);
-    }
-}
-
-function onEsc(event) {
-    if (event.key === "Escape") closeDrawer();
-}
-
-watch(drawerItem, (item) => {
-    document.body.style.overflow = item ? "hidden" : "";
-    if (item) window.addEventListener("keydown", onEsc);
-    else window.removeEventListener("keydown", onEsc);
-});
-
-onBeforeUnmount(() => {
-    document.body.style.overflow = "";
-    window.removeEventListener("keydown", onEsc);
-});
 const currentPath = computed(() => currentUrl.value.split("?")[0]);
 
 const allHrefs = computed(() =>
@@ -232,6 +147,27 @@ const isActive = (href) => {
     const best = matches.reduce((a, b) => (a.length >= b.length ? a : b));
     return best === itemPath;
 };
+
+const expanded = ref({});
+
+function isOpen(item) {
+    if (Object.prototype.hasOwnProperty.call(expanded.value, item.href)) {
+        return expanded.value[item.href];
+    }
+
+    return (item.children || []).some((child) => isActive(child.href));
+}
+
+function toggle(item) {
+    expanded.value = {
+        ...expanded.value,
+        [item.href]: !isOpen(item),
+    };
+}
+
+function rowActive(item) {
+    return isActive(item.href) || (item.children || []).some((child) => isActive(child.href));
+}
 
 function resolveIcon(item) {
     const iconName = item.icon ?? navIconByHref[item.href];
