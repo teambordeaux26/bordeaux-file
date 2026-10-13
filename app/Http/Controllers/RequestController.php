@@ -16,6 +16,7 @@ use App\Services\CertificateSignatureService;
 use App\Support\RequestNotifications;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -73,10 +74,6 @@ class RequestController extends Controller
             ]);
         }
 
-        $year     = now()->year;
-        $count    = DocumentRequest::whereYear('created_at', $year)->count() + 1;
-        $tracking = 'REQ-' . $year . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-
         $stored = $this->storeAttachments($request->file('attachments', []));
 
         if ($stored === null) {
@@ -85,25 +82,41 @@ class RequestController extends Controller
             ])->withInput();
         }
 
-        try {
-            DB::transaction(function () use ($validated, $type, $tracking, $stored) {
-                $record = DocumentRequest::create([
-                    'requester_name'    => $validated['requester_name'],
-                    'requester_email'   => $validated['requester_email'],
-                    'requester_phone'   => $validated['requester_phone'] ?? null,
-                    'requester_address' => $validated['requester_address'],
-                    'request_type_id'   => $type->id,
-                    'request_type'      => $type->name,
-                    'purpose'           => $type->purpose,
-                    'details'           => $validated['details'] ?? null,
-                    'tracking_number'   => $tracking,
-                    'status'            => 'pending',
-                ]);
+        $tracking = null;
 
-                if ($stored !== []) {
-                    $record->attachments()->createMany($stored);
+        try {
+            for ($attempt = 1; $attempt <= 3; $attempt++) {
+                try {
+                    $tracking = DB::transaction(function () use ($validated, $type, $stored) {
+                        $number = $this->nextRequestTrackingNumber();
+
+                        $record = DocumentRequest::create([
+                            'requester_name'    => $validated['requester_name'],
+                            'requester_email'   => $validated['requester_email'],
+                            'requester_phone'   => $validated['requester_phone'] ?? null,
+                            'requester_address' => $validated['requester_address'],
+                            'request_type_id'   => $type->id,
+                            'request_type'      => $type->name,
+                            'purpose'           => $type->purpose,
+                            'details'           => $validated['details'] ?? null,
+                            'tracking_number'   => $number,
+                            'status'            => 'pending',
+                        ]);
+
+                        if ($stored !== []) {
+                            $record->attachments()->createMany($stored);
+                        }
+
+                        return $number;
+                    });
+
+                    break;
+                } catch (UniqueConstraintViolationException $e) {
+                    if ($attempt === 3) {
+                        throw $e;
+                    }
                 }
-            });
+            }
         } catch (\Throwable $e) {
             $this->deleteStoredAttachments($stored);
 
@@ -111,6 +124,25 @@ class RequestController extends Controller
         }
 
         return redirect()->route('requests.status', ['tracking' => $tracking]);
+    }
+
+    /**
+     * Continue from the highest REQ-YEAR number already stored.
+     * Counting rows skips numbers when an earlier request was removed.
+     */
+    private function nextRequestTrackingNumber(): string
+    {
+        $prefix = 'REQ-'.now()->year.'-';
+
+        $highest = DocumentRequest::query()
+            ->where('tracking_number', 'like', $prefix.'%')
+            ->lockForUpdate()
+            ->pluck('tracking_number')
+            ->reduce(function (int $highest, string $number) use ($prefix) {
+                return max($highest, (int) substr($number, strlen($prefix)));
+            }, 0);
+
+        return $prefix.str_pad((string) ($highest + 1), 4, '0', STR_PAD_LEFT);
     }
 
     public function downloadAttachment(DocumentRequest $documentRequest, DocumentRequestAttachment $attachment)

@@ -48,6 +48,31 @@ it('stores multiple files with a guest request', function () {
     }
 });
 
+it('continues the request tracking number after one that is already in use', function () {
+    RequestType::syncDefaults();
+
+    $type = RequestType::query()->where('name', 'Other')->first();
+    $year = now()->year;
+
+    DocumentRequest::query()->create([
+        'requester_name' => 'Earlier Guest',
+        'requester_email' => 'earlier@example.com',
+        'requester_address' => OasBarangays::labels()[0],
+        'request_type' => $type->name,
+        'request_type_id' => $type->id,
+        'purpose' => $type->purpose,
+        'tracking_number' => "REQ-{$year}-0002",
+        'status' => 'pending',
+    ]);
+
+    post('/requests', guestRequestPayload($type->id))->assertRedirect();
+
+    $created = DocumentRequest::query()->where('requester_name', 'Juan Dela Cruz')->first();
+
+    expect($created)->not->toBeNull()
+        ->and($created->tracking_number)->toBe("REQ-{$year}-0003");
+});
+
 it('rejects a guest attachment that is not an allowed document', function () {
     Storage::fake('local');
     RequestType::syncDefaults();
