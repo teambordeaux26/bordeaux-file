@@ -7,7 +7,7 @@
         </div>
 
         <!-- Header -->
-        <header ref="headerEl" class="relative z-50 bg-white border-b-4 border-[#FFD700] shadow-md">
+        <header class="relative z-50 bg-white border-b-4 border-[#FFD700] shadow-md">
             <div class="mx-auto max-w-6xl px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
                 <!-- Branding -->
                 <Link href="/" class="flex items-center gap-3">
@@ -45,8 +45,7 @@
             <!-- Mobile Menu Dropdown -->
             <div
                 v-if="menuOpen && currentNavItem"
-                class="md:hidden fixed left-0 right-0 z-50 border-t border-gray-200 bg-white shadow-lg"
-                :style="{ top: `${menuTop}px` }"
+                class="md:hidden absolute left-0 right-0 top-full z-50 border-t border-gray-200 bg-white shadow-lg"
             >
                 <div class="px-4 py-3 flex flex-col gap-2">
                     <Link
@@ -68,7 +67,7 @@
 
         <div
             v-if="menuOpen"
-            class="fixed inset-0 z-40 bg-black/30 md:hidden"
+            class="fixed inset-0 z-40 bg-[#003366]/70 md:hidden"
             @click="menuOpen = false"
         ></div>
 
@@ -99,15 +98,10 @@ import { computed, ref } from "vue";
 import { Link, usePage } from "@inertiajs/vue3";
 
 const menuOpen = ref(false);
-const headerEl = ref(null);
-const menuTop = ref(0);
 const page = usePage();
 
 function toggleMenu() {
     menuOpen.value = !menuOpen.value;
-    if (menuOpen.value && headerEl.value) {
-        menuTop.value = headerEl.value.getBoundingClientRect().bottom;
-    }
 }
 const site = computed(() => page.props.site ?? {});
 

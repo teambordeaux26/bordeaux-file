@@ -13,7 +13,6 @@
 
         <!-- Header -->
         <header
-            ref="headerEl"
             class="fade-in relative z-50 bg-white border-b-4 border-[#FFD700] shadow-md"
             style="--delay: 120ms"
         >
@@ -104,8 +103,7 @@
             <!-- Mobile Menu Dropdown -->
             <div
                 v-if="menuOpen"
-                class="md:hidden fixed left-0 right-0 z-50 border-t border-gray-200 bg-white shadow-lg"
-                :style="{ top: `${menuTop}px` }"
+                class="md:hidden absolute left-0 right-0 top-full z-50 border-t border-gray-200 bg-white shadow-lg"
             >
                 <div class="px-4 py-3 flex flex-col gap-2">
                     <a
@@ -150,7 +148,7 @@
 
         <div
             v-if="menuOpen"
-            class="fixed inset-0 z-40 bg-black/30 md:hidden"
+            class="fixed inset-0 z-40 bg-[#003366]/70 md:hidden"
             @click="menuOpen = false"
         ></div>
 
@@ -506,17 +504,12 @@ import { computed, ref, onMounted } from "vue";
 import { Head, Link, usePage } from "@inertiajs/vue3";
 
 const menuOpen = ref(false);
-const headerEl = ref(null);
-const menuTop = ref(0);
 const scroller = ref(null);
 const page = usePage();
 const site = computed(() => page.props.site ?? {});
 
 function toggleMenu() {
     menuOpen.value = !menuOpen.value;
-    if (menuOpen.value && headerEl.value) {
-        menuTop.value = headerEl.value.getBoundingClientRect().bottom;
-    }
 }
 
 function watchFadeIns(root, elements) {
