@@ -95,20 +95,31 @@ class RequestTypeController extends Controller
     }
 
     /**
-     * @return array{name: string, purpose: string, issues_certificate: bool, is_active: bool}
+     * @return array{name: string, purpose: string, purposes: list<string>, issues_certificate: bool, is_active: bool}
      */
     protected function validatedPayload(Request $request): array
     {
         $validated = $request->validate([
             'name'               => 'required|string|max:255',
-            'purpose'            => 'required|string|max:255',
+            'purpose'            => 'nullable|string|max:255',
+            'purposes'           => 'nullable|array|max:20',
+            'purposes.*'         => 'nullable|string|max:255',
             'issues_certificate' => 'required|boolean',
             'is_active'          => 'required|boolean',
         ]);
 
+        $purposes = RequestType::normalizePurposes($validated['purposes'] ?? $validated['purpose'] ?? '');
+
+        if ($purposes === []) {
+            throw ValidationException::withMessages([
+                'purpose' => 'Add at least one purpose for this request.',
+            ]);
+        }
+
         return [
             'name'               => trim($validated['name']),
-            'purpose'            => trim($validated['purpose']),
+            'purpose'            => $purposes[0],
+            'purposes'           => $purposes,
             'issues_certificate' => RequestType::booleanValue($validated['issues_certificate']),
             'is_active'          => RequestType::booleanValue($validated['is_active']),
         ];

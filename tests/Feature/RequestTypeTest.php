@@ -47,6 +47,56 @@ it('saves a new request type to the database', function () {
         );
 });
 
+it('saves every purpose an admin adds to a request type', function () {
+    $this->withoutVite();
+    RequestType::syncDefaults();
+
+    $meeting = RequestType::query()->where('name', 'Meeting Request')->first();
+
+    $this->actingAs(requestTypesAdmin())
+        ->put('/settings/request-types/'.$meeting->id, [
+            'name' => $meeting->name,
+            'purposes' => [
+                'Meeting with the Office of the Vice Mayor',
+                'Courtesy call',
+                '',
+            ],
+            'issues_certificate' => false,
+            'is_active' => true,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $meeting->refresh();
+
+    expect($meeting->purposeList())->toBe([
+        'Meeting with the Office of the Vice Mayor',
+        'Courtesy call',
+    ])->and($meeting->purpose)->toBe('Meeting with the Office of the Vice Mayor');
+
+    $address = OasBarangays::labels()[0];
+
+    $this->post('/requests', [
+        'requester_name' => 'Ana Cruz',
+        'requester_email' => 'ana@example.com',
+        'requester_address' => $address,
+        'request_type_id' => $meeting->id,
+        'details' => 'Schedule a courtesy call.',
+    ])->assertSessionHasErrors('purpose');
+
+    $this->post('/requests', [
+        'requester_name' => 'Ana Cruz',
+        'requester_email' => 'ana@example.com',
+        'requester_address' => $address,
+        'request_type_id' => $meeting->id,
+        'purpose' => 'Courtesy call',
+        'details' => 'Schedule a courtesy call.',
+    ])->assertRedirect();
+
+    expect(DocumentRequest::query()->where('requester_email', 'ana@example.com')->first()?->purpose)
+        ->toBe('Courtesy call');
+});
+
 it('stores the connected purpose when a guest submits a request', function () {
     RequestType::syncDefaults();
 

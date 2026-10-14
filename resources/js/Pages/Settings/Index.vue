@@ -221,16 +221,41 @@
                                     <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
                                         Purpose of this request
                                     </label>
-                                    <input
-                                        v-model="type.purpose"
-                                        class="soft-input"
-                                        placeholder="e.g. Official appearance at the Office of the Vice Mayor"
+                                    <div class="space-y-2">
+                                        <div
+                                            v-for="(purpose, purposeIndex) in type.purposes"
+                                            :key="`${type.id}-${purposeIndex}`"
+                                            class="flex items-center gap-2"
+                                        >
+                                            <input
+                                                v-model="type.purposes[purposeIndex]"
+                                                class="soft-input"
+                                                placeholder="e.g. Official appearance at the Office of the Vice Mayor"
+                                                :disabled="typesBusy"
+                                                @blur="saveType(type)"
+                                                @keydown.enter.prevent="onPurposeEnter(type, purposeIndex)"
+                                            />
+                                            <button
+                                                v-if="type.purposes.length > 1"
+                                                type="button"
+                                                class="shrink-0 text-xs font-semibold text-red-700 hover:underline"
+                                                :disabled="typesBusy"
+                                                @click="removePurpose(type, purposeIndex)"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="mt-2 text-xs font-semibold text-[#003366] hover:underline"
                                         :disabled="typesBusy"
-                                        @blur="saveType(type)"
-                                        @keydown.enter.prevent="saveType(type)"
-                                    />
+                                        @click="addPurpose(type)"
+                                    >
+                                        Add another purpose
+                                    </button>
                                     <p class="mt-1 text-[11px] text-gray-500">
-                                        Shown after they pick the name. Stored with the request.
+                                        Add every purpose guests can choose. The one they select is stored with the request.
                                     </p>
                                     <p v-if="fieldError(type, 'purpose')" class="mt-1 text-xs text-red-600">
                                         {{ fieldError(type, 'purpose') }}
@@ -302,12 +327,35 @@
                                     <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
                                         Purpose of this request
                                     </label>
-                                    <input
-                                        v-model="draft.purpose"
-                                        class="soft-input"
-                                        placeholder="e.g. Endorsement from the barangay captain"
-                                        @keydown.enter.prevent="saveDraft"
-                                    />
+                                    <div class="space-y-2">
+                                        <div
+                                            v-for="(purpose, purposeIndex) in draft.purposes"
+                                            :key="`draft-${purposeIndex}`"
+                                            class="flex items-center gap-2"
+                                        >
+                                            <input
+                                                v-model="draft.purposes[purposeIndex]"
+                                                class="soft-input"
+                                                placeholder="e.g. Endorsement from the barangay captain"
+                                                @keydown.enter.prevent="onDraftPurposeEnter(purposeIndex)"
+                                            />
+                                            <button
+                                                v-if="draft.purposes.length > 1"
+                                                type="button"
+                                                class="shrink-0 text-xs font-semibold text-red-700 hover:underline"
+                                                @click="draft.purposes.splice(purposeIndex, 1)"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="mt-2 text-xs font-semibold text-[#003366] hover:underline"
+                                        @click="draft.purposes.push('')"
+                                    >
+                                        Add another purpose
+                                    </button>
                                     <p v-if="draft.errors.purpose" class="mt-1 text-xs text-red-600">{{ draft.errors.purpose }}</p>
                                 </div>
                             </div>
@@ -411,6 +459,7 @@ function hydrateRequestTypes(list) {
         id: type.id,
         name: type.name,
         purpose: type.purpose,
+        purposes: Array.isArray(type.purposes) && type.purposes.length ? [...type.purposes] : [type.purpose || ""],
         issues_certificate: type.issues_certificate,
         is_active: type.is_active,
         fulfillment: type.issues_certificate ? "certificate" : "file",
@@ -418,10 +467,17 @@ function hydrateRequestTypes(list) {
     }));
 }
 
+function filledPurposes(list) {
+    return (list || []).map((purpose) => String(purpose || "").trim()).filter(Boolean);
+}
+
 function typePayload(type) {
+    const purposes = filledPurposes(type.purposes);
+
     return {
         name: String(type.name || "").trim(),
-        purpose: String(type.purpose || "").trim(),
+        purpose: purposes[0] || "",
+        purposes,
         issues_certificate: type.fulfillment === "certificate" ? 1 : 0,
         is_active: type.visibility === "shown" ? 1 : 0,
     };
@@ -436,6 +492,7 @@ const showDraft = ref(false);
 const draft = useForm({
     name: "",
     purpose: "",
+    purposes: [""],
     fulfillment: "file",
     visibility: "shown",
 });
@@ -494,7 +551,8 @@ function saveType(type) {
     }
 
     const payload = typePayload(type);
-    if (! payload.name || ! payload.purpose) {
+    const hasBlankPurpose = (type.purposes || []).some((purpose) => String(purpose || "").trim() === "");
+    if (! payload.name || ! payload.purposes.length || hasBlankPurpose) {
         return;
     }
 
@@ -527,19 +585,50 @@ function moveType(index, direction) {
     }, typeVisit());
 }
 
+function addPurpose(type) {
+    type.purposes.push("");
+}
+
+function removePurpose(type, index) {
+    type.purposes.splice(index, 1);
+    saveType(type);
+}
+
+function onPurposeEnter(type, index) {
+    if (index === type.purposes.length - 1) {
+        addPurpose(type);
+        return;
+    }
+
+    saveType(type);
+}
+
+function onDraftPurposeEnter(index) {
+    if (index === draft.purposes.length - 1) {
+        draft.purposes.push("");
+        return;
+    }
+}
+
 function addType() {
     showDraft.value = true;
     draft.clearErrors();
+    draft.purposes = [""];
 }
 
 function saveDraft() {
     draft
-        .transform((data) => ({
-            name: String(data.name || "").trim(),
-            purpose: String(data.purpose || "").trim(),
-            issues_certificate: data.fulfillment === "certificate" ? 1 : 0,
-            is_active: data.visibility === "shown" ? 1 : 0,
-        }))
+        .transform((data) => {
+            const purposes = filledPurposes(data.purposes);
+
+            return {
+                name: String(data.name || "").trim(),
+                purpose: purposes[0] || "",
+                purposes,
+                issues_certificate: data.fulfillment === "certificate" ? 1 : 0,
+                is_active: data.visibility === "shown" ? 1 : 0,
+            };
+        })
         .post("/settings/request-types", typeVisit({
             onSuccess: () => {
                 draft.reset();

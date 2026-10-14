@@ -132,17 +132,34 @@
 
                         <div>
                             <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
-                                Purpose
+                                Purpose <span v-if="purposeChoices.length > 1" class="text-red-500">*</span>
                             </label>
+                            <select
+                                v-if="purposeChoices.length > 1"
+                                v-model="form.purpose"
+                                class="soft-select"
+                                :class="{ 'border-red-400 focus:border-red-400 focus:ring-red-400': form.errors.purpose }"
+                            >
+                                <option value="">— Select a purpose —</option>
+                                <option v-for="purpose in purposeChoices" :key="purpose" :value="purpose">
+                                    {{ purpose }}
+                                </option>
+                            </select>
                             <input
+                                v-else
                                 class="soft-input bg-gray-50"
                                 type="text"
                                 readonly
-                                :value="selectedType?.purpose || 'Select a request type to see its purpose'"
+                                :value="purposeChoices[0] || 'Select a request type to see its purpose'"
                             />
                             <p class="mt-1 text-xs text-gray-500">
-                                This purpose is set by the office and saved with your request.
+                                {{
+                                    purposeChoices.length > 1
+                                        ? "Choose the purpose that matches this request. It is saved with the request."
+                                        : "This purpose is set by the office and saved with your request."
+                                }}
                             </p>
+                            <p v-if="form.errors.purpose" class="mt-1 text-xs text-red-600">{{ form.errors.purpose }}</p>
                         </div>
                     </div>
 
@@ -299,7 +316,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { Head, useForm, usePage } from "@inertiajs/vue3";
 import { FileUp } from "@lucide/vue";
 import GuestLayout from "../../Layouts/GuestLayout.vue";
@@ -327,6 +344,7 @@ const form = useForm({
     requester_phone:   '',
     requester_address: '',
     request_type_id:   '',
+    purpose:           '',
     details:           '',
     attachments:       [],
 });
@@ -338,6 +356,27 @@ const availableRequestTypes = computed(() =>
 const selectedType = computed(() =>
     availableRequestTypes.value.find((type) => String(type.id) === String(form.request_type_id)) ?? null
 );
+
+const purposeChoices = computed(() => {
+    const type = selectedType.value;
+    if (! type) return [];
+    if (Array.isArray(type.purposes) && type.purposes.length) {
+        return type.purposes.map((purpose) => String(purpose || "").trim()).filter(Boolean);
+    }
+
+    return type.purpose ? [type.purpose] : [];
+});
+
+watch(purposeChoices, (choices) => {
+    if (choices.length === 1) {
+        form.purpose = choices[0];
+        return;
+    }
+
+    if (! choices.includes(form.purpose)) {
+        form.purpose = "";
+    }
+});
 
 const attachmentError = computed(() => {
     if (fileError.value) {
