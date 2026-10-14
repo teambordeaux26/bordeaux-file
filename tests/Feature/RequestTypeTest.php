@@ -108,6 +108,7 @@ it('stores the connected purpose when a guest submits a request', function () {
         'requester_email' => 'juan@example.com',
         'requester_address' => $address,
         'request_type_id' => $type->id,
+        'purpose' => $type->purposeList()[0],
         'details' => 'Need a certificate for GSIS.',
     ])->assertRedirect();
 

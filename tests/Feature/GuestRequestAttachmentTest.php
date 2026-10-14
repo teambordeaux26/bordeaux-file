@@ -15,11 +15,14 @@ uses(RefreshDatabase::class);
 
 function guestRequestPayload(int $typeId, array $extra = []): array
 {
+    $type = RequestType::query()->find($typeId);
+
     return array_merge([
         'requester_name' => 'Juan Dela Cruz',
         'requester_email' => 'juan@example.com',
         'requester_address' => OasBarangays::labels()[0],
         'request_type_id' => $typeId,
+        'purpose' => $type?->purposeList()[0] ?? $type?->purpose,
         'details' => 'Please review the attached proposal.',
     ], $extra);
 }

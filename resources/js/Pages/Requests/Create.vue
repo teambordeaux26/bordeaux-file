@@ -132,32 +132,23 @@
 
                         <div>
                             <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
-                                Purpose <span v-if="purposeChoices.length > 1" class="text-red-500">*</span>
+                                Purpose <span class="text-red-500">*</span>
                             </label>
                             <select
-                                v-if="purposeChoices.length > 1"
                                 v-model="form.purpose"
                                 class="soft-select"
+                                :disabled="!selectedType"
                                 :class="{ 'border-red-400 focus:border-red-400 focus:ring-red-400': form.errors.purpose }"
                             >
-                                <option value="">— Select a purpose —</option>
+                                <option value="">
+                                    {{ selectedType ? '— Select a purpose —' : 'Select a request type first' }}
+                                </option>
                                 <option v-for="purpose in purposeChoices" :key="purpose" :value="purpose">
                                     {{ purpose }}
                                 </option>
                             </select>
-                            <input
-                                v-else
-                                class="soft-input bg-gray-50"
-                                type="text"
-                                readonly
-                                :value="purposeChoices[0] || 'Select a request type to see its purpose'"
-                            />
                             <p class="mt-1 text-xs text-gray-500">
-                                {{
-                                    purposeChoices.length > 1
-                                        ? "Choose the purpose that matches this request. It is saved with the request."
-                                        : "This purpose is set by the office and saved with your request."
-                                }}
+                                Choose the purpose that matches this request. It is saved with the request.
                             </p>
                             <p v-if="form.errors.purpose" class="mt-1 text-xs text-red-600">{{ form.errors.purpose }}</p>
                         </div>
@@ -368,11 +359,6 @@ const purposeChoices = computed(() => {
 });
 
 watch(purposeChoices, (choices) => {
-    if (choices.length === 1) {
-        form.purpose = choices[0];
-        return;
-    }
-
     if (! choices.includes(form.purpose)) {
         form.purpose = "";
     }

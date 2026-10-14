@@ -58,7 +58,7 @@ class RequestController extends Controller
                 'required',
                 Rule::exists('request_types', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
-            'purpose'           => 'nullable|string|max:255',
+            'purpose'           => 'required|string|max:255',
             'details'           => 'nullable|string|max:2000',
             'attachments'       => 'nullable|array|max:10',
             'attachments.*'     => 'file|mimes:pdf,doc,docx,ppt,pptx,png,jpg,jpeg|max:10240',
@@ -78,9 +78,7 @@ class RequestController extends Controller
         $purposes = $type->purposeList();
         $purpose = trim((string) ($validated['purpose'] ?? ''));
 
-        if (count($purposes) === 1) {
-            $purpose = $purposes[0];
-        } elseif (! in_array($purpose, $purposes, true)) {
+        if ($purposes === [] || ! in_array($purpose, $purposes, true)) {
             return back()->withErrors([
                 'purpose' => 'Select one of the purposes for this request.',
             ])->withInput();
