@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DocumentRetentionService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,6 +14,7 @@ class SystemSetting extends Model
         'public_search_fields',
         'public_search_categories',
         'employee_pages',
+        'retention_periods',
         'official_signer_user_id',
     ];
 
@@ -20,6 +22,7 @@ class SystemSetting extends Model
         'public_search_fields'     => 'array',
         'public_search_categories' => 'array',
         'employee_pages'           => 'array',
+        'retention_periods'        => 'array',
     ];
 
     public static function current(): self
@@ -35,6 +38,7 @@ class SystemSetting extends Model
             'public_search_fields'     => static::defaultPublicSearchFields(),
             'public_search_categories' => [],
             'employee_pages'           => static::defaultEmployeePages(),
+            'retention_periods'        => DocumentRetentionService::defaultPeriods(),
             'official_signer_user_id'  => null,
         ];
     }

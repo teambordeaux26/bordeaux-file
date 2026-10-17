@@ -5,7 +5,7 @@
             <PageHeader
                 title="System Settings"
                 kicker="Administration"
-                subtitle="Configure office contact details, public search access, and employee page permissions."
+                subtitle="Configure office contact details, public search access, employee page permissions, and document retention."
             />
 
             <form @submit.prevent="submit" class="space-y-6">
@@ -115,6 +115,88 @@
                     <p v-if="form.errors.employee_pages" class="mt-2 text-xs text-red-600">
                         {{ form.errors.employee_pages }}
                     </p>
+                </SectionCard>
+
+                <SectionCard
+                    title="Document Retention"
+                    eyebrow="Archive"
+                    subtitle="Set how long files stay active before they move to Archive. Add and Remove write to the database right away."
+                >
+                    <div class="space-y-4">
+                        <div
+                            v-for="(period, index) in retentionPeriods"
+                            :key="period.key"
+                            class="grid gap-3 sm:grid-cols-[1fr_10rem_auto] sm:items-end"
+                        >
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                                    Amount
+                                </label>
+                                <input
+                                    v-model.number="period.amount"
+                                    type="number"
+                                    min="1"
+                                    max="3650"
+                                    class="soft-input"
+                                    :placeholder="period.unit === 'months' ? 'e.g. 6' : 'e.g. 30'"
+                                    @blur="persistRetention"
+                                    @keydown.enter.prevent="persistRetention"
+                                />
+                                <p v-if="retentionError(index, 'amount')" class="mt-1 text-xs text-red-600">
+                                    {{ retentionError(index, 'amount') }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1">
+                                    Unit
+                                </label>
+                                <select
+                                    v-model="period.unit"
+                                    class="soft-select"
+                                    @change="persistRetention"
+                                >
+                                    <option value="days">Days</option>
+                                    <option value="months">Months</option>
+                                </select>
+                                <p v-if="retentionError(index, 'unit')" class="mt-1 text-xs text-red-600">
+                                    {{ retentionError(index, 'unit') }}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                class="soft-button-light text-xs h-[42px]"
+                                :disabled="retentionPeriods.length === 1"
+                                @click="removeRetentionPeriod(index)"
+                            >
+                                Remove
+                            </button>
+                        </div>
+
+                        <p v-if="retentionListError" class="text-xs text-red-600">
+                            {{ retentionListError }}
+                        </p>
+
+                        <button
+                            type="button"
+                            class="soft-button-light text-xs"
+                            @click="addRetentionPeriod"
+                        >
+                            Add another retention period
+                        </button>
+
+                        <div class="rounded border border-[#003366]/20 bg-[#003366]/5 px-4 py-3">
+                            <p class="text-[10px] font-bold uppercase tracking-widest text-[#003366]">
+                                Archive filter preview
+                            </p>
+                            <select class="soft-select mt-2 bg-white" disabled>
+                                <option>All retention</option>
+                                <option v-for="label in retentionPreview" :key="label">{{ label }}</option>
+                            </select>
+                            <p class="mt-2 text-xs text-gray-600">
+                                These options appear when staff upload a file and on the Archive retention filter.
+                            </p>
+                        </div>
+                    </div>
                 </SectionCard>
             </form>
 
@@ -486,6 +568,48 @@ function filledPurposes(list) {
     return (list || []).map((purpose) => String(purpose || "").trim()).filter(Boolean);
 }
 
+let retentionKeySeed = 0;
+
+function hydrateRetentionPeriods(list) {
+    const periods = (list || [])
+        .map((period) => ({
+            key: ++retentionKeySeed,
+            amount: Number(period.amount) || 0,
+            unit: period.unit === "months" ? "months" : "days",
+        }))
+        .filter((period) => period.amount > 0);
+
+    return periods.length
+        ? periods
+        : [
+            { key: ++retentionKeySeed, amount: 7, unit: "days" },
+            { key: ++retentionKeySeed, amount: 30, unit: "days" },
+            { key: ++retentionKeySeed, amount: 3, unit: "months" },
+            { key: ++retentionKeySeed, amount: 6, unit: "months" },
+            { key: ++retentionKeySeed, amount: 12, unit: "months" },
+            { key: ++retentionKeySeed, amount: 24, unit: "months" },
+            { key: ++retentionKeySeed, amount: 60, unit: "months" },
+        ];
+}
+
+function serializeRetention(list) {
+    return (list || [])
+        .map((period) => ({
+            amount: Number(period.amount) || 0,
+            unit: period.unit === "months" ? "months" : "days",
+        }))
+        .filter((period) => period.amount > 0);
+}
+
+function retentionLabel(period) {
+    const amount = Number(period.amount) || 0;
+    const unit = period.unit === "months"
+        ? (amount === 1 ? "Month" : "Months")
+        : (amount === 1 ? "Day" : "Days");
+
+    return `${amount} ${unit}`;
+}
+
 function typePayload(type) {
     const purposes = filledPurposes(type.purposes);
 
@@ -527,6 +651,87 @@ const form = useForm({
     employee_pages:           [...props.settings.employee_pages],
     official_signer_user_id:  props.settings.official_signer_user_id ?? "",
 });
+
+const retentionPeriods = ref(hydrateRetentionPeriods(props.settings.retention_periods));
+const retentionBusy = ref(false);
+
+const retentionPreview = computed(() =>
+    retentionPeriods.value
+        .filter((period) => Number(period.amount) > 0)
+        .map((period) => retentionLabel(period)),
+);
+
+const retentionListError = computed(() => {
+    return page.props.errors?.retention_periods ?? form.errors.retention_periods ?? null;
+});
+
+function retentionError(index, field) {
+    return page.props.errors?.[`retention_periods.${index}.${field}`]
+        ?? form.errors[`retention_periods.${index}.${field}`]
+        ?? null;
+}
+
+let retentionSaveTimer = null;
+let retentionSaveQueued = false;
+
+function persistRetention() {
+    clearTimeout(retentionSaveTimer);
+    retentionSaveTimer = setTimeout(() => {
+        flushRetentionSave();
+    }, 50);
+}
+
+function flushRetentionSave() {
+    const periods = serializeRetention(retentionPeriods.value);
+
+    if (!periods.length) {
+        return;
+    }
+
+    if (retentionBusy.value) {
+        retentionSaveQueued = true;
+        return;
+    }
+
+    retentionSaveQueued = false;
+
+    router.put("/settings/retention", { retention_periods: periods }, {
+        preserveScroll: true,
+        onStart: () => {
+            retentionBusy.value = true;
+        },
+        onSuccess: () => {
+            const saved = page.props.settings?.retention_periods;
+            if (saved) {
+                retentionPeriods.value = hydrateRetentionPeriods(saved);
+            }
+        },
+        onFinish: () => {
+            retentionBusy.value = false;
+            if (retentionSaveQueued) {
+                retentionSaveQueued = false;
+                flushRetentionSave();
+            }
+        },
+    });
+}
+
+function addRetentionPeriod() {
+    retentionPeriods.value = [
+        ...retentionPeriods.value,
+        { key: ++retentionKeySeed, amount: 30, unit: "days" },
+    ];
+    persistRetention();
+}
+
+function removeRetentionPeriod(index) {
+    if (retentionPeriods.value.length === 1) {
+        return;
+    }
+
+    retentionPeriods.value = retentionPeriods.value.filter((_, i) => i !== index);
+    persistRetention();
+}
 
 const visibleRequestTypes = computed(() => {
     const saved = types.value.filter((type) => type.visibility === "shown" && String(type.name || "").trim() !== "");
@@ -718,6 +923,7 @@ function submit() {
         .transform((data) => ({
             ...data,
             official_signer_user_id: data.official_signer_user_id || null,
+            retention_periods: serializeRetention(retentionPeriods.value),
         }))
         .put("/settings");
 }

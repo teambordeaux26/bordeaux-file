@@ -23,7 +23,7 @@ class ArchiveController extends Controller
         $filters = $request->validate([
             'q' => 'nullable|string|max:255',
             'category_id' => 'nullable|integer|exists:document_categories,id',
-            'retention_days' => 'nullable|integer|in:7,30,90,180,365,730,1825',
+            'retention_days' => 'nullable|integer|min:1',
             'year' => 'nullable|integer|min:2000|max:2100',
             ...ReportPeriod::requestRules(),
         ]);
@@ -97,9 +97,7 @@ class ArchiveController extends Controller
             'archives' => $archives,
             'totalArchives' => (clone $base)->count(),
             'categoryTree' => DocumentCategory::treeWithCounts($counts),
-            'retentionOptions' => collect($this->retentionOptions())
-                ->map(fn ($label, $days) => ['value' => $days, 'label' => $label])
-                ->values(),
+            'retentionOptions' => DocumentRetentionService::options(),
             'years' => $years,
             'report' => ($period = $this->reportPeriodFrom($request))['ready']
                 ? $this->reports()->archive($period['start'], $period['end'], $period['period'])
@@ -112,22 +110,6 @@ class ArchiveController extends Controller
                 'year' => isset($filters['year']) ? (string) $filters['year'] : '',
             ],
         ]);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function retentionOptions(): array
-    {
-        return [
-            7 => '7 Days',
-            30 => '30 Days',
-            90 => '90 Days',
-            180 => '6 Months',
-            365 => '1 Year',
-            730 => '2 Years',
-            1825 => '5 Years',
-        ];
     }
 
     public function restore(Document $document)

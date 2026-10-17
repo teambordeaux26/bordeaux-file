@@ -207,7 +207,7 @@ const form = useForm({
     title:            '',
     category_id:      props.selectedCategoryId,
     priority:         'Standard',
-    retention_days:   7,
+    retention_days:   props.retentionOptions[0]?.value ?? 7,
     description:      '',
     file:             null,
     access_user_ids:  [],

@@ -128,6 +128,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::put('/settings/retention', [SettingsController::class, 'updateRetention'])->name('settings.retention.update');
     Route::post('/settings/request-types', [RequestTypeController::class, 'store'])->name('settings.request-types.store');
     Route::put('/settings/request-types/reorder', [RequestTypeController::class, 'reorder'])->name('settings.request-types.reorder');
     Route::put('/settings/request-types/{requestType}', [RequestTypeController::class, 'update'])->name('settings.request-types.update');

@@ -126,7 +126,7 @@ class DocumentController extends Controller
         return Inertia::render('Documents/Upload', [
             'categories'       => DocumentCategory::treeForForms(),
             'refNumber'        => $this->generateReferenceNumber(),
-            'retentionOptions' => $this->retentionOptions(),
+            'retentionOptions' => DocumentRetentionService::options(),
             'staff'            => User::staffOptions(Auth::id()),
             'currentUserId'    => Auth::id(),
             'selectedCategoryId' => $selected > 0 ? $selected : null,
@@ -140,7 +140,7 @@ class DocumentController extends Controller
             'category_id'    => 'required|exists:document_categories,id',
             'priority'       => 'required|in:Standard,Priority,Urgent',
             'description'    => 'nullable|string|max:2000',
-            'retention_days' => 'required|integer|in:7,30,90,180,365,730,1825',
+            'retention_days' => ['required', 'integer', Rule::in(DocumentRetentionService::allowedDays())],
             'file'           => 'nullable|file|mimes:pdf,doc,docx,png,jpg,jpeg|max:10240',
             'access_user_ids'   => 'nullable|array',
             'access_user_ids.*' => ['integer', $this->staffUserRule()],
@@ -366,7 +366,7 @@ class DocumentController extends Controller
             ],
             'returnContext'    => $context,
             'categories'       => DocumentCategory::treeForForms(),
-            'retentionOptions' => $this->retentionOptions(),
+            'retentionOptions' => DocumentRetentionService::options((int) $document->retention_days),
         ]);
     }
 
@@ -382,7 +382,7 @@ class DocumentController extends Controller
             'category_id'    => 'required|exists:document_categories,id',
             'priority'       => 'required|in:Standard,Priority,Urgent',
             'description'    => 'nullable|string|max:2000',
-            'retention_days' => 'required|integer|in:7,30,90,180,365,730,1825',
+            'retention_days' => ['required', 'integer', Rule::in(DocumentRetentionService::allowedDays((int) $document->retention_days))],
             'file'           => 'nullable|file|mimes:pdf,doc,docx,png,jpg,jpeg|max:10240',
             'resubmit'       => 'sometimes|boolean',
         ]);
@@ -590,18 +590,5 @@ class DocumentController extends Controller
                          ->count() + 1;
 
         return 'REF-' . $year . $month . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-    }
-
-    private function retentionOptions(): array
-    {
-        return [
-            ['value' => 7, 'label' => '7 Days'],
-            ['value' => 30, 'label' => '30 Days'],
-            ['value' => 90, 'label' => '90 Days'],
-            ['value' => 180, 'label' => '6 Months'],
-            ['value' => 365, 'label' => '1 Year'],
-            ['value' => 730, 'label' => '2 Years'],
-            ['value' => 1825, 'label' => '5 Years'],
-        ];
     }
 }
