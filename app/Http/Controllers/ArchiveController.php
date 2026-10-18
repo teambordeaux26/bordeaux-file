@@ -114,11 +114,14 @@ class ArchiveController extends Controller
 
     public function restore(Document $document)
     {
+        $retentionDays = (int) ($document->retention_days ?: 0);
+
         $document->update([
             'status'      => 'approved',
             'archived_at' => null,
             'restored_at' => now(),
             'restored_by' => Auth::id(),
+            'expires_at'  => $retentionDays > 0 ? now()->addDays($retentionDays) : null,
         ]);
 
         $when = OfficeTime::exact(now());
@@ -135,7 +138,7 @@ class ArchiveController extends Controller
             ],
         ]);
 
-        return redirect()->back()
+        return redirect()->route('documents.index')
             ->with('success', "File {$document->tracking_number} was restored on {$when} by {$actor}.");
     }
 

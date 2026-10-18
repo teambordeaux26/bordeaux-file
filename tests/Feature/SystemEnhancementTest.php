@@ -96,20 +96,29 @@ it('removes a restored document from the archive and records the exact audit sen
         'retention_days' => 30,
         'submitted_by' => $admin->id,
         'archived_at' => now()->subMonth(),
+        'expires_at' => now()->subDay(),
         'submitted_at' => now()->subMonths(2),
     ]);
 
-    actingAs($admin)->put("/archive/{$document->id}/restore")->assertRedirect();
+    actingAs($admin)->put("/archive/{$document->id}/restore")
+        ->assertRedirect(route('documents.index'));
 
     $document->refresh();
 
     expect($document->status)->toBe('approved')
         ->and($document->archived_at)->toBeNull()
-        ->and($document->restored_by)->toBe($admin->id);
+        ->and($document->restored_by)->toBe($admin->id)
+        ->and($document->expires_at?->isFuture())->toBeTrue();
 
     actingAs($admin)->get('/archive')->assertOk()->assertInertia(fn ($page) => $page
         ->where('totalArchives', 0)
         ->has('archives.data', 0));
+
+    actingAs($admin)->get('/documents')->assertOk()->assertInertia(fn ($page) => $page
+        ->component('Documents/Index')
+        ->where('documents.data', fn ($rows) => collect($rows)->contains(
+            fn ($row) => $row['tracking'] === 'DMS-2026-0042'
+        )));
 
     $log = AuditLog::query()->where('action', 'Document Restored')->first();
 

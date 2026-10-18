@@ -269,6 +269,7 @@ function restore(item) {
     if (!confirm(`Restore "${item.title}" from archive?`)) return;
     processing.value = item.id;
     router.put(`/archive/${item.id}/restore`, {}, {
+        preserveScroll: false,
         onFinish: () => { processing.value = null; },
     });
 }
