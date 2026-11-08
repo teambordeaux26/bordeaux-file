@@ -71,7 +71,7 @@ class WorkflowController extends Controller
         $user   = Auth::user();
         $stages = static::stages();
 
-        $documents = Document::with(['category.parent', 'submitter', 'reviewer', 'handler'])
+        $documents = Document::with(['category.parent', 'submitter', 'reviewer', 'handler', 'versions.uploader'])
             ->visibleTo($user)
             ->whereIn('status', array_keys($stages))
             ->orderBy('updated_at', 'desc')
@@ -140,8 +140,10 @@ class WorkflowController extends Controller
                     : null,
                 'edit_url'     => $d->status === 'returned'
                         && ($d->submitted_by === $user->id || $user->role === 'admin')
-                    ? route('documents.edit', $d->id)
+                    ? route('documents.returned', ['edit' => $d->id])
                     : null,
+                'versions'     => $d->versionPayload(),
+                'owner_remarks'=> $d->owner_remarks,
                 'actions'      => static::actionsFor($d, $user),
             ];
         }
@@ -293,7 +295,7 @@ class WorkflowController extends Controller
             ],
             'return' => [
                 'returned',
-                ['returned_at' => now(), 'handled_by' => $document->submitted_by],
+                ['returned_at' => now(), 'handled_by' => $document->submitted_by, 'owner_remarks' => null],
                 "returned to owner",
             ],
             'reject' => [

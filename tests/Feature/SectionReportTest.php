@@ -2,6 +2,7 @@
 
 use App\Models\Certificate;
 use App\Models\Document;
+use App\Models\DocumentCategory;
 use App\Models\User;
 use App\Models\VisitorLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -203,6 +204,64 @@ it('filters document reports to a previous month', function () {
             ->where('report.from', '2026-08-01')
             ->where('report.to', '2026-08-31')
             ->where('report.stats.0.value', 1)
+        );
+});
+
+it('limits document reports to the selected category', function () {
+    $this->withoutVite();
+
+    $staff = reportStaff();
+    $legislative = DocumentCategory::query()->where('name', 'Legislative Documents')->whereNull('parent_id')->firstOrFail();
+    $minutes = DocumentCategory::query()->where('name', 'Meeting Minutes')->whereNull('parent_id')->firstOrFail();
+    $committee = DocumentCategory::query()->where('name', 'Committee Meetings')->firstOrFail();
+    $executive = DocumentCategory::query()->where('name', 'Executive and Administrative Documents')->whereNull('parent_id')->firstOrFail();
+
+    foreach ([
+        ['TRK-LEG', 'Ordinance draft', $legislative->id],
+        ['TRK-MIN', 'Committee notes', $committee->id],
+        ['TRK-EXE', 'Executive memo', $executive->id],
+    ] as [$tracking, $title, $categoryId]) {
+        $document = Document::query()->create([
+            'tracking_number' => $tracking,
+            'title' => $title,
+            'status' => 'pending',
+            'category_id' => $categoryId,
+            'submitted_by' => $staff->id,
+        ]);
+        $document->forceFill([
+            'created_at' => '2026-03-10 09:00:00',
+            'updated_at' => '2026-03-10 09:00:00',
+        ])->saveQuietly();
+    }
+
+    $this->actingAs($staff)
+        ->get('/documents?category_id='.$legislative->id.'&report_period=custom&report_from=2026-03-01&report_to=2026-03-15')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Documents/Index')
+            ->where('report.stats.0.value', 1)
+            ->where('report.breakdown.0.label', 'Legislative Documents')
+            ->where('documents.data', fn ($rows) => collect($rows)->pluck('title')->all() === ['Ordinance draft'])
+        );
+
+    $csv = $this->actingAs($staff)
+        ->get('/documents/reports/export?period=custom&from=2026-03-01&to=2026-03-15&format=csv&category_id='.$legislative->id);
+
+    $csv->assertOk();
+    $content = $csv->streamedContent();
+
+    expect($content)
+        ->toContain('Ordinance draft')
+        ->and($content)->not->toContain('Executive memo')
+        ->and($content)->not->toContain('Committee notes');
+
+    $this->actingAs($staff)
+        ->get('/documents?category_id='.$minutes->id.'&report_period=custom&report_from=2026-03-01&report_to=2026-03-15')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('report.stats.0.value', 1)
+            ->where('report.breakdown.0.label', 'Meeting Minutes — Committee Meetings')
+            ->where('documents.data.0.title', 'Committee notes')
         );
 });
 

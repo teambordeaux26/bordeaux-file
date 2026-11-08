@@ -100,7 +100,13 @@ class ArchiveController extends Controller
             'retentionOptions' => DocumentRetentionService::options(),
             'years' => $years,
             'report' => ($period = $this->reportPeriodFrom($request))['ready']
-                ? $this->reports()->archive($period['start'], $period['end'], $period['period'])
+                ? $this->reports()->archive(
+                    $period['start'],
+                    $period['end'],
+                    $period['period'],
+                    ! empty($filters['category_id']) ? DocumentCategory::idsForFilter((int) $filters['category_id']) : null,
+                    Auth::user()
+                )
                 : $this->emptyReport(),
             'reportRange' => ($period['label'] ?? ''),
             'filters' => [
@@ -144,10 +150,16 @@ class ArchiveController extends Controller
 
     public function exportReport(Request $request)
     {
-        $data = $request->validate(\App\Support\ReportPeriod::exportRules());
+        $data = $request->validate([
+            ...\App\Support\ReportPeriod::exportRules(),
+            'category_id' => 'nullable|integer|exists:document_categories,id',
+        ]);
         $period = $this->reportPeriodFrom($request);
-        $rows = $this->reports()->archiveRows($period['start'], $period['end']);
-        $report = $this->reports()->archive($period['start'], $period['end'], $period['period']);
+        $categoryIds = ! empty($data['category_id'])
+            ? DocumentCategory::idsForFilter((int) $data['category_id'])
+            : null;
+        $rows = $this->reports()->archiveRows($period['start'], $period['end'], $categoryIds, Auth::user());
+        $report = $this->reports()->archive($period['start'], $period['end'], $period['period'], $categoryIds, Auth::user());
         $format = $data['format'] ?? 'csv';
         $stamp = $period['from'].'-to-'.$period['to'];
 

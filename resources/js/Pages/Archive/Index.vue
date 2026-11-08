@@ -166,6 +166,7 @@
                 :range="reportRange"
                 :report="report"
                 export-base="/archive/reports/export"
+                :category-id="filterCategory"
                 @generate="applyReport"
             />
         </div>

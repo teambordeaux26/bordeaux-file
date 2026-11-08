@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Document extends Model
@@ -17,6 +16,7 @@ class Document extends Model
         'tracking_number',
         'title',
         'description',
+        'owner_remarks',
         'category_id',
         'status',
         'priority',
@@ -27,6 +27,7 @@ class Document extends Model
         'submitted_by',
         'reviewed_by',
         'handled_by',
+        'access_roles',
         'approved_at',
         'returned_at',
         'archived_at',
@@ -44,6 +45,7 @@ class Document extends Model
         'expires_at'   => 'datetime',
         'submitted_at' => 'datetime',
         'released_at'  => 'datetime',
+        'access_roles' => 'array',
     ];
 
     public function category(): BelongsTo
@@ -71,23 +73,89 @@ class Document extends Model
         return $this->belongsTo(User::class, 'restored_by');
     }
 
-    public function allowedUsers(): BelongsToMany
-    {
-        return $this->belongsToMany(User::class, 'document_user')->withTimestamps();
-    }
-
     public function statusUpdates(): HasMany
     {
         return $this->hasMany(DocumentStatusUpdate::class);
     }
 
-    public function isRestricted(): bool
+    public function versions(): HasMany
     {
-        if ($this->relationLoaded('allowedUsers')) {
-            return $this->allowedUsers->isNotEmpty();
+        return $this->hasMany(DocumentVersion::class)->orderByDesc('version_number');
+    }
+
+    /**
+     * Keep the current file as an old version and record the uploaded file as the revised version.
+     */
+    public function keepFileAsRevision(string $newPath, string $originalName, ?int $uploadedBy): void
+    {
+        $next = (int) $this->versions()->max('version_number') + 1;
+
+        if ($this->file_path) {
+            $this->versions()->where('label', 'Revised version')->update(['label' => 'Old version']);
+
+            $alreadyStored = $this->versions()->where('file_path', $this->file_path)->exists();
+
+            if (! $alreadyStored) {
+                $this->versions()->create([
+                    'file_path'      => $this->file_path,
+                    'original_name'  => basename($this->file_path),
+                    'label'          => 'Old version',
+                    'version_number' => $next,
+                    'uploaded_by'    => $this->submitted_by,
+                ]);
+                $next++;
+            }
         }
 
-        return $this->allowedUsers()->exists();
+        $this->versions()->create([
+            'file_path'      => $newPath,
+            'original_name'  => $originalName,
+            'label'          => 'Revised version',
+            'version_number' => $next,
+            'uploaded_by'    => $uploadedBy,
+        ]);
+    }
+
+    /**
+     * @return list<array{id: int, label: string, name: string, uploaded_by: string, uploaded_at: string, preview_url: string, download_url: string}>
+     */
+    public function versionPayload(): array
+    {
+        $versions = $this->relationLoaded('versions')
+            ? $this->versions
+            : $this->versions()->with('uploader')->get();
+
+        return $versions->map(fn (DocumentVersion $version) => [
+            'id'           => $version->id,
+            'label'        => $version->label,
+            'name'         => $version->displayName(),
+            'uploaded_by'  => $version->uploader?->name ?? '—',
+            'uploaded_at'  => \App\Support\OfficeTime::exact($version->created_at),
+            'preview_url'  => route('documents.versions.file', [
+                'document' => $this->id,
+                'version'  => $version->id,
+                'inline'   => 1,
+            ]),
+            'download_url' => route('documents.versions.file', [$this, $version]),
+        ])->values()->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function accessRoleList(): array
+    {
+        $roles = is_array($this->access_roles) ? $this->access_roles : [];
+
+        return array_values(array_unique(array_filter(
+            $roles,
+            fn ($role) => is_string($role) && array_key_exists($role, User::documentAccessRoles())
+        )));
+    }
+
+    public function isRestricted(): bool
+    {
+        return $this->accessRoleList() !== [];
     }
 
     public function canBeAccessedBy(?User $user): bool
@@ -108,19 +176,13 @@ class Document extends Model
             return true;
         }
 
-        if ($this->relationLoaded('allowedUsers')) {
-            if ($this->allowedUsers->isEmpty()) {
-                return true;
-            }
+        $roles = $this->accessRoleList();
 
-            return $this->allowedUsers->contains('id', $user->id);
-        }
-
-        if (! $this->allowedUsers()->exists()) {
+        if ($roles === []) {
             return true;
         }
 
-        return $this->allowedUsers()->where('users.id', $user->id)->exists();
+        return in_array($user->role, $roles, true);
     }
 
     public function scopeVisibleTo(Builder $query, User $user): Builder
@@ -132,41 +194,29 @@ class Document extends Model
         return $query->where(function (Builder $builder) use ($user) {
             $builder->where('submitted_by', $user->id)
                 ->orWhere('handled_by', $user->id)
-                ->orWhereDoesntHave('allowedUsers')
-                ->orWhereHas('allowedUsers', fn (Builder $rel) => $rel->where('users.id', $user->id));
+                ->orWhereNull('access_roles')
+                ->orWhereJsonLength('access_roles', 0)
+                ->orWhereJsonContains('access_roles', $user->role);
         });
     }
 
     /**
-     * @param  list<int|string>  $userIds
+     * @param  list<string>  $roles
      */
-    public function syncAllowedUsers(array $userIds): void
+    public function syncAccessRoles(array $roles): void
     {
-        $ids = collect($userIds)
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+        $allowed = array_keys(User::documentAccessRoles());
+        $clean = collect($roles)
+            ->map(fn ($role) => (string) $role)
+            ->filter(fn ($role) => in_array($role, $allowed, true))
             ->unique()
-            ->values();
-
-        if ($ids->isEmpty()) {
-            $this->allowedUsers()->sync([]);
-
-            return;
-        }
-
-        $ids->push((int) $this->submitted_by);
-
-        if ($this->handled_by) {
-            $ids->push((int) $this->handled_by);
-        }
-
-        $valid = User::query()
-            ->whereIn('id', $ids->unique()->all())
-            ->whereIn('role', ['admin', 'employee'])
-            ->where('status', 'active')
-            ->pluck('id')
+            ->values()
             ->all();
 
-        $this->allowedUsers()->sync($valid);
+        sort($clean);
+
+        $this->update([
+            'access_roles' => $clean === [] ? null : $clean,
+        ]);
     }
 }

@@ -67,10 +67,10 @@
                     <div>
                         <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Access</p>
                         <p class="text-gray-900">
-                            {{ document.access?.restricted ? 'Selected staff only' : 'All office staff' }}
+                            {{ document.access?.restricted ? 'Selected roles only' : 'All roles' }}
                         </p>
                         <p v-if="document.access?.restricted" class="text-xs text-gray-500">
-                            {{ document.access.users.map((user) => user.name).join(', ') }}
+                            {{ (document.access.role_labels || []).join(', ') }}
                         </p>
                     </div>
                     <div>
@@ -89,10 +89,57 @@
                         <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-0.5">Description</p>
                         <p class="text-gray-700">{{ document.description }}</p>
                     </div>
+                    <div v-if="document.owner_remarks" class="sm:col-span-2 lg:col-span-3 border-l-4 border-[#003366] bg-blue-50 px-3 py-2">
+                        <p class="text-[10px] uppercase tracking-widest text-[#003366] font-semibold">Remarks from owner</p>
+                        <p class="mt-1 whitespace-pre-line text-sm text-gray-800">{{ document.owner_remarks }}</p>
+                    </div>
+                </div>
+
+                <div v-if="document.versions?.length" class="mb-5 border border-gray-200">
+                    <p class="border-b border-gray-200 bg-gray-50 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                        File versions
+                    </p>
+                    <div
+                        v-for="version in document.versions"
+                        :key="version.id"
+                        class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-3 py-3 last:border-b-0"
+                    >
+                        <div class="min-w-0">
+                            <p
+                                class="text-[10px] font-bold uppercase tracking-widest"
+                                :class="version.label === 'Revised version' ? 'text-[#003366]' : 'text-gray-500'"
+                            >
+                                {{ version.label }}
+                            </p>
+                            <p class="truncate text-sm font-semibold text-slate-900">{{ version.name }}</p>
+                            <p class="text-xs text-gray-500">
+                                {{ version.uploaded_at }}
+                                <span v-if="version.uploaded_by && version.uploaded_by !== '—'">
+                                    · {{ version.uploaded_by }}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <a
+                                :href="version.preview_url"
+                                target="_blank"
+                                rel="noopener"
+                                class="soft-button-light text-xs"
+                            >
+                                View
+                            </a>
+                            <a :href="version.download_url" class="soft-button text-xs">
+                                Download
+                            </a>
+                        </div>
+                    </div>
                 </div>
 
                 <div v-if="preview_url">
-                    <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-3">File Preview</p>
+                    <p class="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-3">
+                        File Preview
+                        <span v-if="document.versions?.length" class="text-[#003366]">· Revised version</span>
+                    </p>
                     <div class="relative border border-gray-300 bg-gray-100" style="min-height: 520px;">
                         <div
                             v-if="loading"
@@ -160,7 +207,7 @@
                 v-if="document.access?.can_edit"
                 title="Access & handler"
                 eyebrow="Sharing"
-                subtitle="Choose who may open this file and who currently has it."
+                subtitle="Choose which roles may open this file and who currently has it."
             >
                 <form class="space-y-5" @submit.prevent="saveSharing">
                     <div>
@@ -168,9 +215,23 @@
                             Who can access this document
                         </label>
                         <p class="mb-2 text-xs text-gray-500">
-                            Leave empty so all office staff can open it. The owner always keeps access.
+                            Leave empty so every role can open it. Select Employee to share it with every employee. Administrators can always open office documents, and the owner always keeps access.
                         </p>
-                        <StaffChecklist v-model="sharing.access_user_ids" :options="staffOptions" />
+                        <div class="grid gap-2 sm:grid-cols-2">
+                            <label
+                                v-for="(label, role) in accessRoles"
+                                :key="role"
+                                class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                            >
+                                <input
+                                    v-model="sharing.access_roles"
+                                    type="checkbox"
+                                    :value="role"
+                                    class="rounded border-gray-300 text-[#003366]"
+                                />
+                                <span>{{ label }}</span>
+                            </label>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="handled_by">
@@ -193,36 +254,29 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
 import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
-import StaffChecklist from "../../Components/StaffChecklist.vue";
 
 const props = defineProps({
     document:     { type: Object, required: true },
     preview_url:  { type: String, default: null },
     download_url: { type: String, default: null },
     staff:        { type: Array, default: () => [] },
+    accessRoles:  { type: Object, default: () => ({ admin: "Administrator", employee: "Employee" }) },
 });
 
 const loading = ref(true);
 
-const staffOptions = computed(() =>
-    props.staff.filter((person) => Number(person.id) !== Number(props.document.owner_id))
-);
-
 const sharing = useForm({
-    access_user_ids: [],
+    access_roles: [],
     handled_by: "",
 });
 
 function hydrateSharing() {
-    const ownerId = Number(props.document.owner_id);
-    sharing.access_user_ids = (props.document.access?.user_ids ?? [])
-        .map((id) => Number(id))
-        .filter((id) => id !== ownerId);
+    sharing.access_roles = [...(props.document.access?.roles ?? [])];
     sharing.handled_by = props.document.handler?.id ?? "";
 }
 
@@ -235,7 +289,7 @@ watch(
 function saveSharing() {
     sharing
         .transform((data) => ({
-            access_user_ids: data.access_user_ids || [],
+            access_roles: data.access_roles || [],
             handled_by: data.handled_by || null,
         }))
         .put(`/documents/${props.document.id}/sharing`, { preserveScroll: true });

@@ -124,10 +124,24 @@
                             Who can access this document
                         </label>
                         <p class="mb-2 text-xs text-gray-500">
-                            Leave empty so all office staff can open it. Select people to restrict access to them — you always keep access.
+                            Leave empty so every role can open it. Select Employee to share it with every employee. Administrators can always open office documents, and you always keep access to files you upload.
                         </p>
-                        <StaffChecklist v-model="form.access_user_ids" :options="staff" />
-                        <p v-if="form.errors.access_user_ids" class="mt-1 text-xs text-red-600">{{ form.errors.access_user_ids }}</p>
+                        <div class="grid gap-2 sm:grid-cols-2">
+                            <label
+                                v-for="(label, role) in accessRoles"
+                                :key="role"
+                                class="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
+                            >
+                                <input
+                                    v-model="form.access_roles"
+                                    type="checkbox"
+                                    :value="role"
+                                    class="rounded border-gray-300 text-[#003366]"
+                                />
+                                <span>{{ label }}</span>
+                            </label>
+                        </div>
+                        <p v-if="form.errors.access_roles" class="mt-1 text-xs text-red-600">{{ form.errors.access_roles }}</p>
                     </div>
 
                     <div class="lg:col-span-2">
@@ -192,13 +206,13 @@ import AppLayout from "../../Layouts/AppLayout.vue";
 import PageHeader from "../../Components/PageHeader.vue";
 import SectionCard from "../../Components/SectionCard.vue";
 import CategoryFields from "../../Components/CategoryFields.vue";
-import StaffChecklist from "../../Components/StaffChecklist.vue";
 
 const props = defineProps({
     categories:       { type: Array, default: () => [] },
     refNumber:        { type: String, default: '' },
     retentionOptions: { type: Array, default: () => [] },
     staff:            { type: Array, default: () => [] },
+    accessRoles:      { type: Object, default: () => ({ admin: "Administrator", employee: "Employee" }) },
     currentUserId:    { type: Number, default: null },
     selectedCategoryId: { type: Number, default: null },
 });
@@ -210,7 +224,7 @@ const form = useForm({
     retention_days:   props.retentionOptions[0]?.value ?? 7,
     description:      '',
     file:             null,
-    access_user_ids:  [],
+    access_roles:     [],
     handled_by:       '',
 });
 
@@ -225,7 +239,7 @@ const submit = () => {
         .transform((data) => ({
             ...data,
             handled_by: data.handled_by || null,
-            access_user_ids: data.access_user_ids || [],
+            access_roles: data.access_roles || [],
         }))
         .post('/documents', {
             forceFormData: true,

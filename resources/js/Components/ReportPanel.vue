@@ -88,6 +88,7 @@ const props = defineProps({
     range: { type: String, default: "" },
     report: { type: Object, default: () => ({ stats: [], breakdown: [], period: "" }) },
     exportBase: { type: String, required: true },
+    categoryId: { type: [String, Number], default: "" },
 });
 
 const emit = defineEmits(["generate"]);
@@ -152,6 +153,10 @@ function exportUrl(format) {
         to: draft.to,
         format,
     });
+
+    if (props.categoryId) {
+        params.set("category_id", String(props.categoryId));
+    }
 
     return `${props.exportBase}?${params.toString()}`;
 }

@@ -24,7 +24,7 @@ class SettingsController extends Controller
                 'office_hours'             => $settings->office_hours,
                 'public_search_fields'     => $settings->public_search_fields ?? SystemSetting::defaultPublicSearchFields(),
                 'public_search_categories' => $settings->public_search_categories ?? [],
-                'employee_pages'           => $settings->employee_pages ?? SystemSetting::defaultEmployeePages(),
+                'employee_pages'           => $settings->employeePageKeys(),
                 'retention_periods'        => DocumentRetentionService::persistable(
                     $settings->retention_periods ?? []
                 ),

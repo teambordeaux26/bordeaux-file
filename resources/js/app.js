@@ -23,6 +23,28 @@ createInertiaApp({
         // Initial page load (full refresh / first visit with a flash).
         showFlash(props.initialPage?.props?.flash);
 
+        const httpMessages = {
+            403: 'You do not have permission to access this page.',
+            404: 'The page you requested could not be found.',
+            419: 'Your session expired. Please sign in again.',
+            500: 'Something went wrong. Please try again.',
+            503: 'The system is temporarily unavailable.',
+        };
+
+        router.on('invalid', (event) => {
+            event.preventDefault();
+            const status = event.detail.response?.status;
+            toast.error(httpMessages[status] || 'Something went wrong. Please try again.');
+            if (status === 419) {
+                window.location.assign('/login');
+            }
+        });
+
+        router.on('exception', (event) => {
+            event.preventDefault();
+            toast.error('Something went wrong. Please try again.');
+        });
+
         // A page restored from the back button must be loaded again so a
         // logged-out session cannot keep showing the office portal.
         window.addEventListener('pageshow', (event) => {

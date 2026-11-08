@@ -78,7 +78,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'site' => fn () => $settings->toSiteProps(),
             'employeePages' => fn () => $request->user()?->role === 'employee'
-                ? ($settings->employee_pages ?? SystemSetting::defaultEmployeePages())
+                ? $settings->employeePageKeys()
                 : null,
             'oasBarangays' => fn () => OasBarangays::options(),
             'returnedCount' => fn () => $this->returnedCountFor($request),

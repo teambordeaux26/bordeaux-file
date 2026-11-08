@@ -225,6 +225,41 @@
                                     Updated {{ doc.updated }}
                                 </p>
 
+                                <div
+                                    v-if="doc.owner_remarks"
+                                    class="mt-3 border-l-4 border-[#003366] bg-blue-50 px-2 py-1.5"
+                                >
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-[#003366]">
+                                        Remarks from owner
+                                    </p>
+                                    <p class="mt-0.5 whitespace-pre-line text-[11px] text-gray-800">{{ doc.owner_remarks }}</p>
+                                </div>
+
+                                <div
+                                    v-if="doc.versions?.length"
+                                    class="mt-3 border border-gray-200 bg-gray-50"
+                                >
+                                    <p class="border-b border-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                                        File versions
+                                    </p>
+                                    <div
+                                        v-for="version in doc.versions"
+                                        :key="version.id"
+                                        class="border-b border-gray-200 px-2 py-1.5 last:border-b-0"
+                                    >
+                                        <p
+                                            class="text-[10px] font-bold uppercase tracking-wider"
+                                            :class="version.label === 'Revised version' ? 'text-[#003366]' : 'text-gray-500'"
+                                        >
+                                            {{ version.label }}
+                                        </p>
+                                        <p class="truncate text-[11px] text-gray-800">{{ version.name }}</p>
+                                        <p class="text-[10px] text-gray-400">
+                                            {{ version.uploaded_at }} · {{ version.uploaded_by }}
+                                        </p>
+                                    </div>
+                                </div>
+
                                 <div class="mt-3 flex flex-wrap gap-1.5">
                                     <button
                                         v-if="doc.has_file && stage.key !== 'pending'"
@@ -236,7 +271,6 @@
                                         View File
                                     </button>
                                     <Link
-                                        v-if="stage.key !== 'pending'"
                                         :href="doc.view_url"
                                         class="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1.5 border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 transition"
                                     >

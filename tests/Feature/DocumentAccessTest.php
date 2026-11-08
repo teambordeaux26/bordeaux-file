@@ -24,42 +24,51 @@ function leafCategory(): DocumentCategory
     ]);
 }
 
-it('lets an uploader restrict access and assign a current handler', function () {
+it('lets an uploader restrict access by role and assign a current handler', function () {
     $this->withoutVite();
 
     $owner = documentStaff(['name' => 'Owner Staff']);
-    $handler = documentStaff(['name' => 'Assigned Handler']);
-    $outsider = documentStaff(['name' => 'Other Staff']);
+    $colleague = documentStaff(['name' => 'Same Role']);
+    $admin = documentStaff(['name' => 'Office Admin', 'role' => 'admin']);
     $category = leafCategory();
 
     $this->actingAs($owner)
         ->post('/documents', [
-            'title' => 'Confidential Memo',
+            'title' => 'Employee Memo',
             'category_id' => $category->id,
             'priority' => 'Standard',
             'retention_days' => 7,
-            'access_user_ids' => [$handler->id],
-            'handled_by' => $handler->id,
+            'access_roles' => ['employee'],
+            'handled_by' => $colleague->id,
         ])
         ->assertRedirect(route('documents.index'));
 
-    $document = Document::query()->where('title', 'Confidential Memo')->first();
+    $document = Document::query()->where('title', 'Employee Memo')->first();
 
     expect($document)->not->toBeNull()
-        ->and($document->handled_by)->toBe($handler->id)
-        ->and($document->allowedUsers()->pluck('users.id')->all())
-        ->toContain($handler->id)
-        ->toContain($owner->id);
+        ->and($document->handled_by)->toBe($colleague->id)
+        ->and($document->access_roles)->toBe(['employee']);
 
-    $this->actingAs($handler)->get(route('documents.show', $document))->assertOk();
-    $this->actingAs($outsider)->get(route('documents.show', $document))->assertForbidden();
-    $this->actingAs($outsider)->get(route('documents.index'))
+    $this->actingAs($colleague)->get(route('documents.show', $document))->assertOk();
+    $this->actingAs($admin)->get(route('documents.show', $document))->assertOk();
+
+    $this->actingAs($owner)
+        ->put(route('documents.sharing', $document), [
+            'access_roles' => ['admin'],
+            'handled_by' => null,
+        ])
+        ->assertRedirect();
+
+    expect($document->fresh()->access_roles)->toBe(['admin']);
+
+    $this->actingAs($owner)->get(route('documents.show', $document))->assertOk();
+    $this->actingAs($admin)->get(route('documents.show', $document))->assertOk();
+    $this->actingAs($colleague)->get(route('documents.show', $document))->assertForbidden();
+    $this->actingAs($colleague)->get(route('documents.index'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Documents/Index')
-            ->where('documents.data', fn ($rows) => collect($rows)->every(
-                fn ($row) => $row['title'] !== 'Confidential Memo'
-            ))
+            ->where('documents.data', fn ($rows) => collect($rows)->pluck('title')->doesntContain('Employee Memo'))
         );
 });
 

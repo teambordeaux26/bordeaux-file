@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\DocumentCategory;
 use App\Models\DocumentStatusUpdate;
+use App\Models\DocumentVersion;
 use App\Models\User;
 use App\Services\DocumentRetentionService;
 use App\Support\DocumentStatus;
@@ -35,7 +36,7 @@ class DocumentController extends Controller
             ...ReportPeriod::requestRules(),
         ]);
 
-        $query = Document::with(['category.parent', 'submitter', 'handler', 'allowedUsers'])
+        $query = Document::with(['category.parent', 'submitter', 'handler'])
             ->visibleTo(Auth::user())
             ->where('status', '!=', 'archived');
 
@@ -74,8 +75,9 @@ class DocumentController extends Controller
             ->all();
 
         $period = $this->reportPeriodFrom($request);
+        $categoryIds = $this->reportCategoryIds($filters['category_id'] ?? null);
         $report = $period['ready']
-            ? $this->reports()->documents($period['start'], $period['end'], $period['period'])
+            ? $this->reports()->documents($period['start'], $period['end'], $period['period'], $categoryIds, Auth::user())
             : $this->emptyReport();
 
         return Inertia::render('Documents/Index', [
@@ -93,11 +95,15 @@ class DocumentController extends Controller
 
     public function exportReport(Request $request)
     {
-        $data = $request->validate(ReportPeriod::exportRules());
+        $data = $request->validate([
+            ...ReportPeriod::exportRules(),
+            'category_id' => 'nullable|integer|exists:document_categories,id',
+        ]);
 
         $period = $this->reportPeriodFrom($request);
-        $rows   = $this->reports()->documentRows($period['start'], $period['end']);
-        $report = $this->reports()->documents($period['start'], $period['end'], $period['period']);
+        $categoryIds = $this->reportCategoryIds($data['category_id'] ?? null);
+        $rows   = $this->reports()->documentRows($period['start'], $period['end'], $categoryIds, Auth::user());
+        $report = $this->reports()->documents($period['start'], $period['end'], $period['period'], $categoryIds, Auth::user());
         $format = $data['format'] ?? 'csv';
         $stamp  = $period['from'].'-to-'.$period['to'];
 
@@ -128,6 +134,7 @@ class DocumentController extends Controller
             'refNumber'        => $this->generateReferenceNumber(),
             'retentionOptions' => DocumentRetentionService::options(),
             'staff'            => User::staffOptions(Auth::id()),
+            'accessRoles'      => User::documentAccessRoles(),
             'currentUserId'    => Auth::id(),
             'selectedCategoryId' => $selected > 0 ? $selected : null,
         ]);
@@ -142,8 +149,8 @@ class DocumentController extends Controller
             'description'    => 'nullable|string|max:2000',
             'retention_days' => ['required', 'integer', Rule::in(DocumentRetentionService::allowedDays())],
             'file'           => 'nullable|file|mimes:pdf,doc,docx,png,jpg,jpeg|max:10240',
-            'access_user_ids'   => 'nullable|array',
-            'access_user_ids.*' => ['integer', $this->staffUserRule()],
+            'access_roles'      => 'nullable|array',
+            'access_roles.*'    => 'in:'.implode(',', array_keys(User::documentAccessRoles())),
             'handled_by'        => ['nullable', 'integer', $this->staffUserRule()],
         ]);
 
@@ -173,7 +180,7 @@ class DocumentController extends Controller
             'submitted_at'    => now(),
         ]);
 
-        $document->syncAllowedUsers($validated['access_user_ids'] ?? []);
+        $document->syncAccessRoles($validated['access_roles'] ?? []);
         $document->load('handler');
 
         DocumentStatusUpdate::create([
@@ -204,7 +211,7 @@ class DocumentController extends Controller
             'category.parent',
             'submitter',
             'handler',
-            'allowedUsers',
+            'versions.uploader',
             'statusUpdates' => fn ($query) => $query->with('updater')->orderBy('id'),
         ]);
 
@@ -217,6 +224,7 @@ class DocumentController extends Controller
                 'reference'   => $document->reference_no,
                 'title'       => $document->title,
                 'description' => $document->description ?? '—',
+                'owner_remarks' => $document->owner_remarks,
                 'category'    => $document->category?->label() ?? '—',
                 'status'      => DocumentStatus::label($document->status),
                 'priority'    => $document->priority,
@@ -228,17 +236,13 @@ class DocumentController extends Controller
                     'position' => $document->handler->position ?: 'Staff',
                 ] : null,
                 'access'      => [
-                    'restricted' => $document->isRestricted(),
-                    'users'      => $document->allowedUsers
-                        ->map(fn (User $user) => [
-                            'id'       => $user->id,
-                            'name'     => $user->name,
-                            'position' => $user->position ?: 'Staff',
-                        ])
+                    'restricted'  => $document->isRestricted(),
+                    'roles'       => $document->accessRoleList(),
+                    'role_labels' => collect($document->accessRoleList())
+                        ->map(fn (string $role) => User::documentAccessRoles()[$role] ?? ucfirst($role))
                         ->values()
                         ->all(),
-                    'user_ids'   => $document->allowedUsers->pluck('id')->all(),
-                    'can_edit'   => Auth::user()->role === 'admin' || $document->submitted_by === Auth::id(),
+                    'can_edit'    => Auth::user()->role === 'admin' || $document->submitted_by === Auth::id(),
                 ],
                 'trail'       => $document->statusUpdates->map(fn (DocumentStatusUpdate $update) => [
                     'id'      => $update->id,
@@ -255,6 +259,7 @@ class DocumentController extends Controller
                 'expires_at'  => $document->expires_at?->format('M d, Y') ?? '—',
                 'has_file'    => (bool) $document->file_path,
                 'previewable' => $previewable,
+                'versions'    => $document->versionPayload(),
             ],
             'preview_url'  => $previewable
                 ? route('documents.file', ['document' => $document->id, 'inline' => 1])
@@ -263,6 +268,7 @@ class DocumentController extends Controller
                 ? route('documents.file', $document->id)
                 : null,
             'staff'        => User::staffOptions(),
+            'accessRoles'  => User::documentAccessRoles(),
         ]);
     }
 
@@ -276,15 +282,15 @@ class DocumentController extends Controller
         }
 
         $validated = $request->validate([
-            'access_user_ids'   => 'nullable|array',
-            'access_user_ids.*' => ['integer', $this->staffUserRule()],
-            'handled_by'        => ['nullable', 'integer', $this->staffUserRule()],
+            'access_roles'   => 'nullable|array',
+            'access_roles.*' => 'in:'.implode(',', array_keys(User::documentAccessRoles())),
+            'handled_by'     => ['nullable', 'integer', $this->staffUserRule()],
         ]);
 
         $document->update([
             'handled_by' => $validated['handled_by'] ?? null,
         ]);
-        $document->syncAllowedUsers($validated['access_user_ids'] ?? []);
+        $document->syncAccessRoles($validated['access_roles'] ?? []);
 
         AuditLog::create([
             'user_id'     => $user->id,
@@ -303,7 +309,7 @@ class DocumentController extends Controller
     public function returnedIndex()
     {
         $user  = Auth::user();
-        $query = Document::with(['category.parent', 'submitter'])
+        $query = Document::with(['category.parent', 'submitter', 'versions.uploader'])
             ->where('status', 'returned')
             ->latest('returned_at');
 
@@ -315,24 +321,34 @@ class DocumentController extends Controller
             $context = $this->returnContext($doc);
 
             return [
-                'id'            => $doc->id,
-                'tracking'      => $doc->tracking_number,
-                'reference'     => $doc->reference_no,
-                'title'         => $doc->title,
-                'category'      => $doc->category?->label() ?? '—',
-                'priority'      => $doc->priority,
-                'owner'         => $doc->submitter?->name ?? '—',
-                'returned_at'   => OfficeTime::exact($doc->returned_at),
-                'returned_from' => $context['from_label'],
-                'returned_by'   => $context['by'],
-                'remarks'       => $context['remarks'],
-                'edit_url'      => route('documents.edit', $doc->id),
-                'view_url'      => route('documents.show', $doc->id),
+                'id'             => $doc->id,
+                'tracking'       => $doc->tracking_number,
+                'reference'      => $doc->reference_no,
+                'title'          => $doc->title,
+                'description'    => $doc->description,
+                'category'       => $doc->category?->label() ?? '—',
+                'category_id'    => $doc->category_id,
+                'priority'       => $doc->priority,
+                'retention_days' => (int) $doc->retention_days,
+                'owner'          => $doc->submitter?->name ?? '—',
+                'returned_at'    => OfficeTime::exact($doc->returned_at),
+                'returned_from'  => $context['from_label'],
+                'returned_by'    => $context['by'],
+                'remarks'        => $context['remarks'],
+                'file_name'      => $doc->file_path ? basename($doc->file_path) : null,
+                'file_url'       => $doc->file_path
+                    ? route('documents.file', ['document' => $doc->id, 'inline' => 1])
+                    : null,
+                'versions'       => $doc->versionPayload(),
+                'view_url'       => route('documents.show', $doc->id),
             ];
         });
 
         return Inertia::render('Documents/Returned', [
-            'documents' => $documents,
+            'documents'        => $documents,
+            'categories'       => DocumentCategory::treeForForms(),
+            'retentionOptions' => DocumentRetentionService::options(),
+            'editingId'        => request()->integer('edit') ?: null,
         ]);
     }
 
@@ -345,29 +361,7 @@ class DocumentController extends Controller
         $this->authorizeEdit($document);
         $this->authorizeDocumentAccess($document);
 
-        $document->load('category.parent');
-        $context = $this->returnContext($document);
-
-        return Inertia::render('Documents/Edit', [
-            'document' => [
-                'id'             => $document->id,
-                'tracking'       => $document->tracking_number,
-                'reference'      => $document->reference_no,
-                'title'          => $document->title,
-                'description'    => $document->description,
-                'category_id'    => $document->category_id,
-                'priority'       => $document->priority,
-                'retention_days' => (int) $document->retention_days,
-                'file_name'      => $document->file_path ? basename($document->file_path) : null,
-                'view_url'       => route('documents.show', $document->id),
-                'file_url'       => $document->file_path
-                    ? route('documents.file', ['document' => $document->id, 'inline' => 1])
-                    : null,
-            ],
-            'returnContext'    => $context,
-            'categories'       => DocumentCategory::treeForForms(),
-            'retentionOptions' => DocumentRetentionService::options((int) $document->retention_days),
-        ]);
+        return redirect()->route('documents.returned', ['edit' => $document->id]);
     }
 
     /**
@@ -377,14 +371,19 @@ class DocumentController extends Controller
     {
         $this->authorizeEdit($document);
 
+        $resubmit = $request->boolean('resubmit');
+
         $validated = $request->validate([
             'title'          => 'required|string|max:255',
             'category_id'    => 'required|exists:document_categories,id',
             'priority'       => 'required|in:Standard,Priority,Urgent',
             'description'    => 'nullable|string|max:2000',
+            'owner_remarks'  => [$resubmit ? 'required' : 'nullable', 'string', 'max:2000'],
             'retention_days' => ['required', 'integer', Rule::in(DocumentRetentionService::allowedDays((int) $document->retention_days))],
             'file'           => 'nullable|file|mimes:pdf,doc,docx,png,jpg,jpeg|max:10240',
             'resubmit'       => 'sometimes|boolean',
+        ], [
+            'owner_remarks.required' => 'Please add remarks for the reviewer.',
         ]);
 
         $this->assertLeafCategory((int) $validated['category_id']);
@@ -394,18 +393,23 @@ class DocumentController extends Controller
             'category_id'    => $validated['category_id'],
             'priority'       => $validated['priority'],
             'description'    => $validated['description'] ?? null,
+            'owner_remarks'  => trim((string) ($validated['owner_remarks'] ?? '')) ?: null,
             'retention_days' => (int) $validated['retention_days'],
             'expires_at'     => now()->addDays((int) $validated['retention_days']),
         ];
 
-        if ($request->hasFile('file')) {
-            if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-                Storage::disk('public')->delete($document->file_path);
-            }
-            $updates['file_path'] = $request->file('file')->store('documents', 'public');
-        }
+        $replacedFile = false;
 
-        $resubmit = (bool) ($validated['resubmit'] ?? false);
+        if ($request->hasFile('file')) {
+            $stored = $request->file('file')->store('documents', 'public');
+            $document->keepFileAsRevision(
+                $stored,
+                $request->file('file')->getClientOriginalName(),
+                Auth::id(),
+            );
+            $updates['file_path'] = $stored;
+            $replacedFile = true;
+        }
 
         if ($resubmit) {
             $updates['status']       = 'pending';
@@ -416,12 +420,19 @@ class DocumentController extends Controller
 
         $document->update($updates);
 
+        $ownerRemarks = trim((string) ($validated['owner_remarks'] ?? ''));
+        $systemNote = $replacedFile
+            ? 'Previous file kept as the old version. The new file is the revised version.'
+            : ($resubmit
+                ? 'Revised and resubmitted by owner.'
+                : 'Owner saved revisions (still in Returned).');
+
         DocumentStatusUpdate::create([
             'document_id' => $document->id,
             'status'      => $resubmit ? 'pending' : 'returned',
-            'remarks'     => $resubmit
-                ? 'Revised and resubmitted by owner.'
-                : 'Owner saved revisions (still in Returned).',
+            'remarks'     => $ownerRemarks !== ''
+                ? "Remarks from owner:\n{$ownerRemarks}\n\n{$systemNote}"
+                : $systemNote,
             'updated_by'  => Auth::id(),
         ]);
 
@@ -514,6 +525,28 @@ class DocumentController extends Controller
         return Storage::disk('public')->download($document->file_path, $filename);
     }
 
+    public function versionFile(Document $document, DocumentVersion $version)
+    {
+        $this->authorizeDocumentAccess($document);
+        abort_unless($version->document_id === $document->id, 404);
+
+        if (! Storage::disk('public')->exists($version->file_path)) {
+            abort(404);
+        }
+
+        $filename = str_replace(['"', '\\'], '', $version->displayName());
+
+        if (request()->boolean('inline')) {
+            return Storage::disk('public')->response(
+                $version->file_path,
+                $filename,
+                ['Content-Disposition' => 'inline; filename="' . $filename . '"']
+            );
+        }
+
+        return Storage::disk('public')->download($version->file_path, $filename);
+    }
+
     protected function authorizeDocumentAccess(Document $document): void
     {
         abort_unless($document->canBeAccessedBy(Auth::user()), 403, 'You do not have access to this document.');
@@ -542,7 +575,7 @@ class DocumentController extends Controller
             'priority'      => $doc->priority,
             'owner'         => $doc->submitter?->name ?? '—',
             'handler'       => $doc->handler?->name ?? 'Unassigned',
-            'restricted'    => $doc->allowedUsers->isNotEmpty(),
+            'restricted'    => $doc->isRestricted(),
             'updated'       => OfficeTime::exact($doc->updated_at),
             'retention'     => $doc->retention_days
                 ? DocumentRetentionService::formatRetention($doc->retention_days)
@@ -564,6 +597,16 @@ class DocumentController extends Controller
                 'category_id' => 'Please select a sub-category for '.$category->name.'.',
             ]);
         }
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private function reportCategoryIds(mixed $categoryId): ?array
+    {
+        $id = (int) $categoryId;
+
+        return $id > 0 ? DocumentCategory::idsForFilter($id) : null;
     }
 
     private function isPreviewable(string $path): bool

@@ -86,6 +86,7 @@ class SystemSetting extends Model
             'documents.store'       => 'documents',
             'documents.show'        => 'documents',
             'documents.file'        => 'documents',
+            'documents.versions.file' => 'documents',
             'documents.returned'    => 'documents',
             'documents.edit'        => 'documents',
             'documents.update'      => 'documents',
@@ -111,11 +112,24 @@ class SystemSetting extends Model
         return $this->belongsTo(User::class, 'official_signer_user_id');
     }
 
+    /**
+     * Page keys employees may open. Older records stored Workflow as "tracking".
+     *
+     * @return list<string>
+     */
+    public function employeePageKeys(): array
+    {
+        $pages = $this->employee_pages ?? static::defaultEmployeePages();
+
+        return array_values(array_unique(array_map(
+            fn ($page) => $page === 'tracking' ? 'workflow' : $page,
+            $pages,
+        )));
+    }
+
     public function allowsEmployeePage(string $pageKey): bool
     {
-        $allowed = $this->employee_pages ?? static::defaultEmployeePages();
-
-        return in_array($pageKey, $allowed, true);
+        return in_array($pageKey, $this->employeePageKeys(), true);
     }
 
     public function allowsEmployeeRoute(?string $routeName): bool

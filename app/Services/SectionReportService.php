@@ -5,11 +5,12 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\Certificate;
 use App\Models\Document;
+use App\Models\User;
 use App\Models\VisitorLog;
-use App\Services\DocumentRetentionService;
 use App\Support\DocumentStatus;
 use App\Support\ReportPeriod;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class SectionReportService
@@ -17,16 +18,17 @@ class SectionReportService
     /**
      * @return array{period: string, label: string, stats: list<array{label: string, value: int|string}>, breakdown: list<array{label: string, value: int}>}
      */
-    public function documents(Carbon $start, Carbon $end, string $period): array
+    public function documents(Carbon $start, Carbon $end, string $period, ?array $categoryIds = null, ?User $viewer = null): array
     {
-        $submitted   = Document::whereBetween('created_at', [$start, $end])->count();
-        $approved    = Document::whereBetween('approved_at', [$start, $end])->count();
-        $returned    = Document::whereBetween('returned_at', [$start, $end])->count();
-        $disapproved = Document::where('status', 'rejected')->whereBetween('updated_at', [$start, $end])->count();
-        $archived    = Document::whereBetween('archived_at', [$start, $end])->count();
-        $released    = Document::whereBetween('released_at', [$start, $end])->count();
+        $submitted   = $this->scopedDocuments($categoryIds, $viewer)->whereBetween('created_at', [$start, $end])->count();
+        $approved    = $this->scopedDocuments($categoryIds, $viewer)->whereBetween('approved_at', [$start, $end])->count();
+        $returned    = $this->scopedDocuments($categoryIds, $viewer)->whereBetween('returned_at', [$start, $end])->count();
+        $disapproved = $this->scopedDocuments($categoryIds, $viewer)->where('status', 'rejected')->whereBetween('updated_at', [$start, $end])->count();
+        $archived    = $this->scopedDocuments($categoryIds, $viewer)->whereBetween('archived_at', [$start, $end])->count();
+        $released    = $this->scopedDocuments($categoryIds, $viewer)->whereBetween('released_at', [$start, $end])->count();
 
-        $byCategory = Document::with('category.parent')
+        $byCategory = $this->scopedDocuments($categoryIds, $viewer)
+            ->with('category.parent')
             ->where(function ($query) use ($start, $end) {
                 $query->whereBetween('created_at', [$start, $end])
                     ->orWhereBetween('approved_at', [$start, $end])
@@ -62,7 +64,7 @@ class SectionReportService
     /**
      * @return list<array<string, mixed>>
      */
-    public function documentRows(Carbon $start, Carbon $end): array
+    public function documentRows(Carbon $start, Carbon $end, ?array $categoryIds = null, ?User $viewer = null): array
     {
         $rows = [];
 
@@ -82,7 +84,8 @@ class SectionReportService
             ];
         };
 
-        $documents = Document::with(['category.parent', 'submitter'])
+        $documents = $this->scopedDocuments($categoryIds, $viewer)
+            ->with(['category.parent', 'submitter'])
             ->where(function ($query) use ($start, $end) {
                 $query->whereBetween('created_at', [$start, $end])
                     ->orWhereBetween('approved_at', [$start, $end])
@@ -245,12 +248,13 @@ class SectionReportService
     /**
      * @return array{period: string, label: string, stats: list<array{label: string, value: int|string}>, breakdown: list<array{label: string, value: int}>}
      */
-    public function archive(Carbon $start, Carbon $end, string $period): array
+    public function archive(Carbon $start, Carbon $end, string $period, ?array $categoryIds = null, ?User $viewer = null): array
     {
-        $archived = Document::whereBetween('archived_at', [$start, $end])->count();
-        $restored = Document::whereBetween('restored_at', [$start, $end])->count();
+        $archived = $this->scopedDocuments($categoryIds, $viewer)->whereBetween('archived_at', [$start, $end])->count();
+        $restored = $this->scopedDocuments($categoryIds, $viewer)->whereBetween('restored_at', [$start, $end])->count();
 
-        $byCategory = Document::with('category.parent')
+        $byCategory = $this->scopedDocuments($categoryIds, $viewer)
+            ->with('category.parent')
             ->whereBetween('archived_at', [$start, $end])
             ->get()
             ->groupBy(fn (Document $doc) => $doc->category?->label() ?? 'Uncategorized')
@@ -276,9 +280,10 @@ class SectionReportService
     /**
      * @return list<array<string, string>>
      */
-    public function archiveRows(Carbon $start, Carbon $end): array
+    public function archiveRows(Carbon $start, Carbon $end, ?array $categoryIds = null, ?User $viewer = null): array
     {
-        return Document::with(['category.parent', 'submitter'])
+        return $this->scopedDocuments($categoryIds, $viewer)
+            ->with(['category.parent', 'submitter'])
             ->whereBetween('archived_at', [$start, $end])
             ->orderBy('archived_at')
             ->get()
@@ -341,6 +346,16 @@ class SectionReportService
                 'ip' => $log->ip_address ?? '—',
             ])
             ->all();
+    }
+
+    /**
+     * @param  list<int>|null  $categoryIds
+     */
+    private function scopedDocuments(?array $categoryIds, ?User $viewer): Builder
+    {
+        return Document::query()
+            ->when($viewer, fn (Builder $query) => $query->visibleTo($viewer))
+            ->when($categoryIds, fn (Builder $query) => $query->whereIn('category_id', $categoryIds));
     }
 
     private function periodTitle(string $period, string $subject): string

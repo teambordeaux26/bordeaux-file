@@ -73,6 +73,7 @@ Route::middleware(['auth', 'role:admin,employee', 'employee.page'])->group(funct
     Route::put('/documents/{document}/sharing',   [DocumentController::class, 'updateSharing'])->name('documents.sharing');
     Route::get('/documents/{document}',           [DocumentController::class, 'show'])->name('documents.show');
     Route::get('/documents/{document}/file',      [DocumentController::class, 'file'])->name('documents.file');
+    Route::get('/documents/{document}/versions/{version}/file', [DocumentController::class, 'versionFile'])->name('documents.versions.file');
 
     // Visitors
     Route::get('/visitors',  [VisitorController::class, 'index'])->name('visitors.index');

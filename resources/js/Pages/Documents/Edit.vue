@@ -172,8 +172,21 @@
                             @change="handleFile"
                         />
                         <p class="mt-1 text-[11px] text-gray-500">
-                            Leave empty to keep the current file. Upload a new one to replace it.
+                            Leave empty to keep the current file. A new upload keeps the current file as the old version and becomes the revised version.
                         </p>
+                    </div>
+
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-1" for="owner_remarks">
+                            Remarks for the reviewer <span class="text-red-500">*</span>
+                        </label>
+                        <textarea
+                            id="owner_remarks"
+                            v-model="form.owner_remarks"
+                            class="soft-input min-h-[90px] resize-y"
+                            placeholder="Tell the reviewer what you changed."
+                        ></textarea>
+                        <p v-if="form.errors.owner_remarks" class="mt-1 text-xs text-red-600">{{ form.errors.owner_remarks }}</p>
                     </div>
 
                     <div class="lg:col-span-2 flex flex-col sm:flex-row gap-3 pt-3 border-t border-gray-200">
@@ -227,6 +240,7 @@ const form = useForm({
     priority:       props.document.priority || "Standard",
     retention_days: props.document.retention_days || 7,
     description:    props.document.description || "",
+    owner_remarks:  "",
     file:           null,
     resubmit:       false,
 });
@@ -237,6 +251,11 @@ function handleFile(e) {
 
 function submit(resubmit) {
     form.resubmit = resubmit;
+    form.clearErrors("owner_remarks");
+    if (resubmit && !String(form.owner_remarks || "").trim()) {
+        form.setError("owner_remarks", "Please add remarks for the reviewer.");
+        return;
+    }
     form.post(`/documents/${props.document.id}`, {
         forceFormData: true,
     });

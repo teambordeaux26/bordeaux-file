@@ -83,6 +83,17 @@ class User extends Authenticatable
     /**
      * @return list<array{id: int, name: string, role: string, department: ?string, position: string, label: string}>
      */
+    /**
+     * @return array<string, string>
+     */
+    public static function documentAccessRoles(): array
+    {
+        return [
+            'admin'    => 'Administrator',
+            'employee' => 'Employee',
+        ];
+    }
+
     public static function staffOptions(?int $exceptId = null): array
     {
         return static::query()
